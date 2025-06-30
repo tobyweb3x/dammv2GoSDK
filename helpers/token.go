@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	ag_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -116,7 +117,7 @@ func GetAllPositionNftAccountByOwner(
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get token accounts: %w", err)
 	}
 
 	if tokenAccounts == nil || len(tokenAccounts.Value) == 0 {

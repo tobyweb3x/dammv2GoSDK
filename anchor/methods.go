@@ -19,3 +19,4 @@ type PgMethods[T PgMethodI] struct {
 	conn                 *rpc.Client
 	account              func() T
 }
+

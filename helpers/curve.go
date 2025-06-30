@@ -26,8 +26,8 @@ func GetNextSqrtPrice(
 		numerator := new(big.Int).Mul(liquidity, sqrtPrice)
 		return new(big.Int).Div(
 			new(big.Int).Add(
-				new(big.Int).Sub(denominator, big.NewInt(1)),
 				numerator,
+				new(big.Int).Sub(denominator, big.NewInt(1)),
 			),
 			denominator,
 		)
@@ -98,7 +98,8 @@ func GetAmountAFromLiquidityDelta(
 
 	if rounding == types.RoundingUp {
 		return new(big.Int).Div(
-			new(big.Int).Add(product, new(big.Int).Sub(denominator, big.NewInt(1))),
+			new(big.Int).Add(
+				product, new(big.Int).Sub(denominator, big.NewInt(1))),
 			denominator,
 		)
 	}
@@ -121,7 +122,8 @@ func GetAmountBFromLiquidityDelta(
 
 	if rounding == types.RoundingUp {
 		return new(big.Int).Div(
-			new(big.Int).Add(result, new(big.Int).Sub(one, big.NewInt(1))),
+			new(big.Int).Add(
+				result, new(big.Int).Sub(one, big.NewInt(1))),
 			one,
 		)
 	}

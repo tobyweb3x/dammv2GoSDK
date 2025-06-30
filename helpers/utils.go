@@ -26,7 +26,6 @@ func GetMinAmountWithSlippage(amount *big.Int, rate float64) *big.Int {
 }
 
 func BigIntToUint128(b *big.Int) (ag_binary.Uint128, error) {
-	var x ag_binary.Uint128
 
 	// Make a copy of the bytes
 	bBytes := b.Bytes()
@@ -37,6 +36,7 @@ func BigIntToUint128(b *big.Int) (ag_binary.Uint128, error) {
 	ag_binary.ReverseBytes(copied)
 
 	// Decode safely
+	var x ag_binary.Uint128
 	err := x.UnmarshalWithDecoder(ag_binary.NewBinDecoder(copied))
 	if err != nil {
 		return ag_binary.Uint128{}, err
