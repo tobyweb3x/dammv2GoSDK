@@ -1,6 +1,7 @@
 package dammv2gosdk
 
 import (
+	"encoding/binary"
 	"slices"
 
 	"github.com/gagliardetto/solana-go"
@@ -98,6 +99,18 @@ func DeriveCustomizablePoolAddress(
 			[]byte("cpool"),
 			GetFirstkey(tokenAMint, tokenBMint),
 			GetSecondkey(tokenAMint, tokenBMint),
+		},
+		CpAMMProgramId,
+	)
+	return pda
+}
+func DeriveConfigAddress(index uint64) solana.PublicKey {
+	space := make([]byte, 8)
+	binary.LittleEndian.PutUint64(space, index)
+	pda, _, _ := solana.FindProgramAddress(
+		[][]byte{
+			[]byte("config"),
+			space,
 		},
 		CpAMMProgramId,
 	)

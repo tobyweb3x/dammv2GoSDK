@@ -12,10 +12,6 @@ import (
 )
 
 var (
-	// NativeMint address of the special mint for wrapped native SOL in spl-token.
-	//   NativeMint = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111112")
-	NativeMint = solana.MustPublicKeyFromBase58("So11111111111111111111111111111111111111112")
-
 	// NativeMint2022 address of the special mint for wrapped native SOL in spl-token-2022.
 	//   NativeMint2022 = solana.MustPublicKeyFromBase58("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP")
 	NativeMint2022 = solana.MustPublicKeyFromBase58("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP")
@@ -63,10 +59,6 @@ func GetAccount(
 	commitment rpc.CommitmentType,
 	programId solana.PublicKey,
 ) (token.Account, error) {
-
-	if programId.IsZero() {
-		programId = solana.TokenProgramID
-	}
 
 	acc, err := conn.GetAccountInfoWithOpts(
 		ctx,

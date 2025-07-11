@@ -84,7 +84,7 @@ func UnwrapSOLInstruction(
 ) (*token.Instruction, error) {
 
 	wSolATAAccount, err := GetAssociatedTokenAddressSync(
-		NativeMint,
+		solana.WrappedSol,
 		owner,
 		allowOwnerOffCurve,
 		solana.PublicKey{},

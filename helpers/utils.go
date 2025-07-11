@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"dammv2GoSDK/constants"
+	"fmt"
 	"math/big"
 
 	ag_binary "github.com/gagliardetto/binary"
@@ -26,22 +27,33 @@ func GetMinAmountWithSlippage(amount *big.Int, rate float64) *big.Int {
 }
 
 func BigIntToUint128(b *big.Int) (ag_binary.Uint128, error) {
+	if b.Sign() < 0 {
+		return ag_binary.Uint128{}, fmt.Errorf("value must be unsigned")
+	}
 
-	// Make a copy of the bytes
-	bBytes := b.Bytes()
-	copied := make([]byte, len(bBytes))
-	copy(copied, bBytes)
+	if b.BitLen() > 128 {
+		return ag_binary.Uint128{}, fmt.Errorf("value %s exceeds 128 bits", b.String())
+	}
 
-	// Reverse the copied bytes
-	ag_binary.ReverseBytes(copied)
+	var buf [16]byte
+	b.FillBytes(buf[:]) // zero-pads on the left
 
-	// Decode safely
-	var x ag_binary.Uint128
-	err := x.UnmarshalWithDecoder(ag_binary.NewBinDecoder(copied))
-	if err != nil {
+	ag_binary.ReverseBytes(buf[:])
+
+	var u ag_binary.Uint128
+	if err := u.UnmarshalWithDecoder(ag_binary.NewBinDecoder(buf[:])); err != nil {
 		return ag_binary.Uint128{}, err
 	}
-	return x, nil
+	return u, nil
+}
+
+// Must helper
+func MustBigIntToUint128(b *big.Int) ag_binary.Uint128 {
+	v, err := BigIntToUint128(b)
+	if err != nil {
+		panic(fmt.Errorf("cannot fit big.Int into Uint128: %s", err.Error()))
+	}
+	return v
 }
 
 // GetPriceImpact calculates the percentage difference between the current and next sqrt prices.

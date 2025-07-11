@@ -14,7 +14,10 @@ func CalculateTransferFeeExcludedAmount(
 	return struct {
 		Amount      *big.Int
 		TransferFee *big.Int
-	}{}
+	}{
+		Amount:      big.NewInt(0),
+		TransferFee: big.NewInt(0),
+	}
 }
 
 func CalculateTransferFeeIncludedAmount(
@@ -25,5 +28,8 @@ func CalculateTransferFeeIncludedAmount(
 	return struct {
 		Amount      *big.Int
 		TransferFee *big.Int
-	}{}
+	}{
+		Amount:      big.NewInt(0),
+		TransferFee: big.NewInt(0),
+	}
 }

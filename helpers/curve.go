@@ -55,8 +55,8 @@ func GetLiquidityDeltaFromAmountA(
 	amountA, lowerSqrtPrice, upperSqrtPrice *big.Int,
 ) *big.Int {
 	product := new(big.Int).Mul(
-		upperSqrtPrice,
 		new(big.Int).Mul(lowerSqrtPrice, amountA),
+		upperSqrtPrice,
 	) // Q128.128
 	denominator := new(big.Int).Sub(upperSqrtPrice, lowerSqrtPrice) // Q64.64
 
@@ -74,8 +74,8 @@ func GetLiquidityDeltaFromAmountA(
 func GetLiquidityDeltaFromAmountB(
 	amountB, lowerSqrtPrice, upperSqrtPrice *big.Int,
 ) *big.Int {
-	product := new(big.Int).Lsh(amountB, 128)
 	denominator := new(big.Int).Sub(upperSqrtPrice, lowerSqrtPrice)
+	product := new(big.Int).Lsh(amountB, 128)
 
 	return new(big.Int).Div(product, denominator)
 }

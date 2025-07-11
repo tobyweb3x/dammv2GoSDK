@@ -17,6 +17,13 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 )
 
+var (
+	// cpAMM program ID.
+	//  CpAMMProgramId = solana.MustPublicKeyFromBase58("cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG")
+	CpAMMProgramId = cp_amm.ProgramID
+)
+
+// CpAMM SDK class to interact with the DAMM-V2.
 type CpAMM struct {
 	poolAuthority solana.PublicKey
 	conn          *rpc.Client
@@ -34,8 +41,8 @@ func (cp *CpAMM) prepareTokenAccounts(
 	ctx context.Context,
 	param types.PrepareTokenAccountParams,
 ) (struct {
-	TokenAAta, TokenBAta                 solana.PublicKey
-	GetOrCreateAtaIxA, GetOrCreateAtaIxB *solana.GenericInstruction
+	TokenAAta, TokenBAta solana.PublicKey
+	CreateATAIxns        []solana.Instruction
 }, error) {
 
 	type res struct {
@@ -47,6 +54,7 @@ func (cp *CpAMM) prepareTokenAccounts(
 		wg   sync.WaitGroup
 		a, b res
 	)
+
 	wg.Add(2)
 
 	go func(p *res, wg *sync.WaitGroup) {
@@ -98,24 +106,33 @@ func (cp *CpAMM) prepareTokenAccounts(
 
 	if a.Err != nil || b.Err != nil {
 		return struct {
-				TokenAAta         solana.PublicKey
-				TokenBAta         solana.PublicKey
-				GetOrCreateAtaIxA *solana.GenericInstruction
-				GetOrCreateAtaIxB *solana.GenericInstruction
+				TokenAAta     solana.PublicKey
+				TokenBAta     solana.PublicKey
+				CreateATAIxns []solana.Instruction
 			}{},
 			fmt.Errorf("err from token A— %s: err from tokenB— %s", handleNilErr(a.Err), handleNilErr(b.Err))
 	}
 
+	prepareATAIxns := func() []solana.Instruction {
+		ixns := make([]solana.Instruction, 0, 2)
+		if a.Ix != nil {
+			ixns = append(ixns, a.Ix)
+		}
+		if b.Ix != nil {
+			ixns = append(ixns, b.Ix)
+		}
+
+		return slices.Clip(ixns)
+	}
+
 	return struct {
-		TokenAAta         solana.PublicKey
-		TokenBAta         solana.PublicKey
-		GetOrCreateAtaIxA *solana.GenericInstruction
-		GetOrCreateAtaIxB *solana.GenericInstruction
+		TokenAAta     solana.PublicKey
+		TokenBAta     solana.PublicKey
+		CreateATAIxns []solana.Instruction
 	}{
-		TokenAAta:         a.AtaPubkey,
-		TokenBAta:         b.AtaPubkey,
-		GetOrCreateAtaIxA: a.Ix,
-		GetOrCreateAtaIxB: b.Ix,
+		TokenAAta:     a.AtaPubkey,
+		TokenBAta:     b.AtaPubkey,
+		CreateATAIxns: prepareATAIxns(),
 	}, nil
 }
 
@@ -139,8 +156,8 @@ func (cp CpAMM) GetTokenBadgeAccounts(
 // buildAddLiquidityInstruction builds an instruction to add liquidity to a position.
 func (cp CpAMM) buildAddLiquidityInstruction(
 	param types.BuildAddLiquidityParams,
-) *cp_amm.Instruction {
-	return cp_amm.NewAddLiquidityInstruction(
+) (*cp_amm.Instruction, error) {
+	addLiquidityPtr := cp_amm.NewAddLiquidityInstruction(
 		cp_amm.AddLiquidityParameters{
 			LiquidityDelta:        param.LiquidityDelta,
 			TokenAAmountThreshold: param.TokenAAmountThreshold,
@@ -159,15 +176,21 @@ func (cp CpAMM) buildAddLiquidityInstruction(
 		param.TokenAProgram,
 		param.TokenBProgram,
 		solana.PublicKey{},
-		solana.PublicKey{},
-	).Build()
+		CpAMMProgramId,
+	)
+	eventAuthPDA, _, err := addLiquidityPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	return addLiquidityPtr.SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
 }
 
 // buildRemoveAllLiquidityInstruction builds an instruction to remove all liquidity from a position.
 func (cp CpAMM) buildRemoveAllLiquidityInstruction(
 	param types.BuildRemoveAllLiquidityInstructionParams,
-) *cp_amm.Instruction {
-	return cp_amm.NewRemoveLiquidityInstruction(
+) (*cp_amm.Instruction, error) {
+	removeLiquidityPtr := cp_amm.NewRemoveLiquidityInstruction(
 		cp_amm.RemoveLiquidityParameters{
 			// LiquidityDelta: ,
 			TokenAAmountThreshold: param.TokenAAmountThreshold,
@@ -187,15 +210,20 @@ func (cp CpAMM) buildRemoveAllLiquidityInstruction(
 		param.TokenAProgram,
 		param.TokenBProgram,
 		solana.PublicKey{},
-		solana.PublicKey{},
-	).Build()
+		CpAMMProgramId,
+	)
+	eventAuthPDA, _, err := removeLiquidityPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+	return removeLiquidityPtr.SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
 }
 
 // buildClaimPositionFeeInstruction builds an instruction to claim fees accumulated by a position.
 func (cp CpAMM) buildClaimPositionFeeInstruction(
 	param types.ClaimPositionFeeInstructionParams,
-) *cp_amm.Instruction {
-	return cp_amm.NewClaimPositionFeeInstruction(
+) (*cp_amm.Instruction, error) {
+	claimPositionFeePtr := cp_amm.NewClaimPositionFeeInstruction(
 		param.PoolAuthority,
 		param.Pool,
 		param.Position,
@@ -210,15 +238,20 @@ func (cp CpAMM) buildClaimPositionFeeInstruction(
 		param.TokenAProgram,
 		param.TokenBProgram,
 		solana.PublicKey{},
-		solana.PublicKey{},
-	).Build()
+		CpAMMProgramId,
+	)
+	eventAuthPDA, _, err := claimPositionFeePtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+	return claimPositionFeePtr.SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
 }
 
 // buildClosePositionInstruction builds an instruction to close a position.
-func (cp CpAMM) buildClosePositionInstruction(
-	param types.ClosePositionInstructionParams,
-) *cp_amm.Instruction {
-	return cp_amm.NewClosePositionInstruction(
+func (cp CpAMM) ClosePosition(
+	param types.ClosePositionParams,
+) (*cp_amm.Instruction, error) {
+	closePositonPtr := cp_amm.NewClosePositionInstruction(
 		param.PositionNftMint,
 		param.PositionNftAccount,
 		param.Pool,
@@ -228,8 +261,13 @@ func (cp CpAMM) buildClosePositionInstruction(
 		param.Owner,
 		solana.Token2022ProgramID,
 		solana.PublicKey{},
-		solana.PublicKey{},
-	).Build()
+		CpAMMProgramId,
+	)
+	eventAuthPDA, _, err := closePositonPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+	return closePositonPtr.SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
 }
 
 func (cp CpAMM) buildRefreshVestingInstruction(
@@ -263,7 +301,7 @@ func (cp *CpAMM) buildLiquidatePositionInstruction(
 
 	ixns := make([]*cp_amm.Instruction, 0, 3)
 	// 1. claim position fee
-	claimPositionFeeInstruction := cp.buildClaimPositionFeeInstruction(
+	claimPositionFeeInstruction, err := cp.buildClaimPositionFeeInstruction(
 		types.ClaimPositionFeeInstructionParams{
 			Owner:              param.Owner,
 			PoolAuthority:      cp.poolAuthority,
@@ -280,10 +318,14 @@ func (cp *CpAMM) buildLiquidatePositionInstruction(
 			TokenBProgram:      helpers.GetTokenProgram(param.PoolState.TokenBFlag),
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+
 	ixns = append(ixns, claimPositionFeeInstruction)
 
 	// 2. remove all liquidity
-	removeAllLiquidityInstruction := cp.buildRemoveAllLiquidityInstruction(
+	removeAllLiquidityInstruction, err := cp.buildRemoveAllLiquidityInstruction(
 		types.BuildRemoveAllLiquidityInstructionParams{
 			PoolAuthority:         cp.poolAuthority,
 			Owner:                 param.Owner,
@@ -302,11 +344,15 @@ func (cp *CpAMM) buildLiquidatePositionInstruction(
 			TokenBProgram:         helpers.GetTokenProgram(param.PoolState.TokenBFlag),
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+
 	ixns = append(ixns, removeAllLiquidityInstruction)
 
 	// 3. close position
-	closePositionInstruction := cp.buildClosePositionInstruction(
-		types.ClosePositionInstructionParams{
+	closePositionInstruction, err := cp.ClosePosition(
+		types.ClosePositionParams{
 			Owner:              param.Owner,
 			PoolAuthority:      cp.poolAuthority,
 			Pool:               param.PositionState.Pool,
@@ -315,6 +361,10 @@ func (cp *CpAMM) buildLiquidatePositionInstruction(
 			PositionNftAccount: param.PositionNftAccount,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+
 	ixns = append(ixns, closePositionInstruction)
 
 	return ixns, nil
@@ -330,7 +380,7 @@ func (cp *CpAMM) buildCreatePositionInstruction(
 	position := DerivePositionAddress(param.PositionNft)
 	positionNftAccount := DerivePositionNftAccount(param.PositionNft)
 
-	ix, err := cp_amm.NewCreatePositionInstruction(
+	createPositionPtr := cp_amm.NewCreatePositionInstruction(
 		param.Owner,
 		param.PositionNft,
 		positionNftAccount,
@@ -341,8 +391,20 @@ func (cp *CpAMM) buildCreatePositionInstruction(
 		solana.Token2022ProgramID,
 		solana.SystemProgramID,
 		solana.PublicKey{},
-		solana.PublicKey{},
-	).ValidateAndBuild()
+		CpAMMProgramId,
+	)
+
+	eventAuthPDA, _, err := createPositionPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return struct {
+			Position          solana.PublicKey
+			PositonNftAccount solana.PublicKey
+			Ix                *cp_amm.Instruction
+		}{}, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	ix, err := createPositionPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return struct {
 			Position          solana.PublicKey
@@ -384,10 +446,10 @@ func (cp *CpAMM) prepareCreatePoolParams(
 		return nil, err
 	}
 
-	preInstructions := make([]solana.Instruction, 0, 2+2+2)
-	preInstructions = append(preInstructions, res.GetOrCreateAtaIxA, res.GetOrCreateAtaIxB)
+	preInstructions := make([]solana.Instruction, 0, len(res.CreateATAIxns)+2+2)
+	preInstructions = append(preInstructions, res.CreateATAIxns...)
 
-	if param.TokenAMint.Equals(helpers.NativeMint) {
+	if param.TokenAMint.Equals(solana.WrappedSol) {
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Payer,
 			res.TokenAAta,
@@ -395,11 +457,11 @@ func (cp *CpAMM) prepareCreatePoolParams(
 		)
 		preInstructions = append(preInstructions, wrapSOLIx...)
 	}
-	if param.TokenBMint.Equals(helpers.NativeMint) {
+	if param.TokenBMint.Equals(solana.WrappedSol) {
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Payer,
 			res.TokenBAta,
-			param.TokenAAmount,
+			param.TokenBAmount,
 		)
 		preInstructions = append(preInstructions, wrapSOLIx...)
 	}
@@ -431,24 +493,21 @@ func (cp *CpAMM) setupFeeClaimAccounts(
 	ctx context.Context,
 	param types.SetupFeeClaimAccountsParams,
 ) (setupFeeClaimAccountsResult, error) {
-	tokenAIsSOL := param.TokenAMint.Equals(helpers.NativeMint)
-	tokenBIsSOL := param.TokenBMint.Equals(helpers.NativeMint)
+	tokenAIsSOL := param.TokenAMint.Equals(solana.WrappedSol)
+	tokenBIsSOL := param.TokenBMint.Equals(solana.WrappedSol)
 	hasSolToken := tokenAIsSOL || tokenBIsSOL
 
-	tokenAOwner := param.Owner
-	tokenBOwner := param.Owner
+	tokenAOwner, tokenBOwner := param.Owner, param.Owner
 
 	if !param.Receiver.IsZero() {
-		if tokenAIsSOL && !param.TempWSolAccount.IsZero() {
+		tokenAOwner = param.Receiver
+		if tokenAIsSOL {
 			tokenAOwner = param.TempWSolAccount
-		} else {
-			tokenAOwner = param.Receiver
 		}
 
-		if tokenBIsSOL && !param.TempWSolAccount.IsZero() {
+		tokenBOwner = param.Receiver
+		if tokenBIsSOL {
 			tokenBOwner = param.TempWSolAccount
-		} else {
-			tokenBOwner = param.Receiver
 		}
 	}
 
@@ -468,7 +527,7 @@ func (cp *CpAMM) setupFeeClaimAccounts(
 	preInstructions := make([]solana.Instruction, 0, 3)
 	postInstructions := make([]solana.Instruction, 0, 3)
 
-	preInstructions = append(preInstructions, accs.GetOrCreateAtaIxA, accs.GetOrCreateAtaIxB)
+	preInstructions = append(preInstructions, accs.CreateATAIxns...)
 
 	if hasSolToken {
 		var (
@@ -765,9 +824,6 @@ func (cp CpAMM) CanUnlockPosition(
 	vestings []types.Vesting,
 	currentPoint *big.Int,
 ) (canUnlock bool, reason string) {
-	if len(vestings) == 0 {
-		return false, "len of vesting is zero"
-	}
 
 	// check if permanently locked
 	if cp.IsPermanentLockedPosition(positionState) {
@@ -1021,7 +1077,7 @@ func GetWithdrawQuote(param types.GetWithdrawQuoteParams) WithdrawQuote {
 func PreparePoolCreationSingleSide(param *types.PreparePoolCreationSingleSideParams) (*big.Int, error) {
 
 	if param.InitSqrtPrice.Cmp(param.MinSqrtPrice) != 0 {
-		return nil, errors.New("only support single side for base token.")
+		return nil, errors.New("only support single side for base token")
 	}
 	actualAmountIn := param.TokenAAmount
 	if param.TokenAInfo != nil {
@@ -1041,7 +1097,8 @@ func PreparePoolCreationSingleSide(param *types.PreparePoolCreationSingleSidePar
 	), nil
 }
 
-func PreparePoolCreationParams(param types.PreparePoolCreationParams,
+func PreparePoolCreationParams(
+	param types.PreparePoolCreationParams,
 ) (struct{ InitSqrtPrice, LiquidityDelta *big.Int }, error) {
 
 	if param.TokenAAmount.Cmp(big.NewInt(0)) == 0 &&
@@ -1215,10 +1272,12 @@ func (cp *CpAMM) CreateCustomPool(
 }, error) {
 
 	pool := DeriveCustomizablePoolAddress(param.TokenAMint, param.TokenBMint)
+
 	tokenBAmount := param.TokenBAmount
 	if param.TokenBMint.Equals(solana.WrappedSol) && tokenBAmount == 0 {
 		tokenBAmount = 1
 	}
+
 	createPoolParams, err := cp.prepareCreatePoolParams(
 		ctx,
 		types.PrepareCustomizablePoolParams{
@@ -1244,7 +1303,7 @@ func (cp *CpAMM) CreateCustomPool(
 	postInstruction := make([]solana.Instruction, 0, 1)
 
 	if param.IsLockLiquidity {
-		permanentLockIx, err := cp_amm.NewPermanentLockPositionInstruction(
+		permanentLockPtr := cp_amm.NewPermanentLockPositionInstruction(
 			param.LiquidityDelta,
 			pool,
 			createPoolParams.Positon,
@@ -1252,7 +1311,19 @@ func (cp *CpAMM) CreateCustomPool(
 			param.Creator,
 			solana.PublicKey{},
 			CpAMMProgramId,
-		).ValidateAndBuild()
+		)
+		eventAuthPDA, _, err := permanentLockPtr.FindEventAuthorityAddress()
+		if err != nil {
+			return struct {
+				Pool     solana.PublicKey
+				Position solana.PublicKey
+				Ixns     []solana.Instruction
+			}{}, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+		}
+
+		permanentLockIx, err := permanentLockPtr.
+			SetEventAuthorityAccount(eventAuthPDA).
+			ValidateAndBuild()
 		if err != nil {
 			return struct {
 				Pool     solana.PublicKey
@@ -1260,6 +1331,7 @@ func (cp *CpAMM) CreateCustomPool(
 				Ixns     []solana.Instruction
 			}{}, err
 		}
+
 		postInstruction = append(postInstruction, permanentLockIx)
 	}
 
@@ -1295,6 +1367,16 @@ func (cp *CpAMM) CreateCustomPool(
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
+	eventAuthPDA, _, err := initCustomizablePoolPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return struct {
+			Pool     solana.PublicKey
+			Position solana.PublicKey
+			Ixns     []solana.Instruction
+		}{}, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+	initCustomizablePoolPtr.SetEventAuthorityAccount(eventAuthPDA)
+
 	accountMetaSlice := slices.Grow(initCustomizablePoolPtr.AccountMetaSlice, len(createPoolParams.TokenBadgeAccounts))
 	accountMetaSlice = append(accountMetaSlice, createPoolParams.TokenBadgeAccounts...)
 	initCustomizablePoolPtr.AccountMetaSlice = accountMetaSlice
@@ -1309,6 +1391,7 @@ func (cp *CpAMM) CreateCustomPool(
 	}
 
 	ixns := make([]solana.Instruction, 0, 1+1+len(createPoolParams.Ixns))
+
 	ixns = append(ixns, createPoolParams.Ixns...)
 	ixns = append(ixns, currentIx)
 	ixns = append(ixns, postInstruction...)
@@ -1471,9 +1554,10 @@ func (cp *CpAMM) AddLiquidity(
 	if err != nil {
 		return nil, err
 	}
+
 	preInstructions := make([]solana.Instruction, 0, 2)
-	preInstructions = append(preInstructions, preparedTokenAccs.GetOrCreateAtaIxA,
-		preparedTokenAccs.GetOrCreateAtaIxB)
+	preInstructions = append(preInstructions, preparedTokenAccs.CreateATAIxns...)
+
 	if param.TokenAMint.Equals(solana.WrappedSol) {
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Owner,
@@ -1508,7 +1592,7 @@ func (cp *CpAMM) AddLiquidity(
 		}
 	}
 
-	addLiquidityInstruction := cp.buildAddLiquidityInstruction(
+	addLiquidityInstruction, err := cp.buildAddLiquidityInstruction(
 		types.BuildAddLiquidityParams{
 			Pool:                  param.Pool,
 			Position:              param.Position,
@@ -1527,6 +1611,9 @@ func (cp *CpAMM) AddLiquidity(
 			TokenBAmountThreshold: param.TokenBAmountThreshold,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	res := make([]solana.Instruction, 0, len(preInstructions)+len(postInstructions)+1)
 	res = append(res, preInstructions...)
@@ -1561,8 +1648,7 @@ func (cp *CpAMM) CreatePositionAndAddLiquidity(
 	tokenBVault := DeriveTokenVaultAddress(param.TokenBMint, param.Pool)
 
 	preInstructions := make([]solana.Instruction, 0, 2)
-	preInstructions = append(preInstructions, preparedTokenAccs.GetOrCreateAtaIxA,
-		preparedTokenAccs.GetOrCreateAtaIxB)
+	preInstructions = append(preInstructions, preparedTokenAccs.CreateATAIxns...)
 	if param.TokenAMint.Equals(solana.WrappedSol) {
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Owner,
@@ -1608,7 +1694,8 @@ func (cp *CpAMM) CreatePositionAndAddLiquidity(
 	if err != nil {
 		return nil, err
 	}
-	addLiquidityInstruction := cp.buildAddLiquidityInstruction(
+
+	addLiquidityInstruction, err := cp.buildAddLiquidityInstruction(
 		types.BuildAddLiquidityParams{
 			Pool:                  param.Pool,
 			Position:              buildCreatePositionIns.Position,
@@ -1627,6 +1714,10 @@ func (cp *CpAMM) CreatePositionAndAddLiquidity(
 			TokenBAmountThreshold: param.TokenBAmountThreshold,
 		},
 	)
+
+	if err != nil {
+		return nil, err
+	}
 
 	res := make([]solana.Instruction, 0, len(preInstructions)+len(postInstructions)+1)
 	res = append(res, preInstructions...)
@@ -1715,8 +1806,13 @@ func (cp *CpAMM) RemoveLiquidity(
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
+	eventAuthPDA, _, err := removeLiquidityPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
 
-	currentIx, err := removeLiquidityPtr.ValidateAndBuild()
+	currentIx, err := removeLiquidityPtr.
+		SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
@@ -1807,7 +1903,14 @@ func (cp *CpAMM) RemoveALLLiquidity(
 		CpAMMProgramId,
 	)
 
-	currentIx, err := removeLiquidityPtr.ValidateAndBuild()
+	eventAuthPDA, _, err := removeLiquidityPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	currentIx, err := removeLiquidityPtr.
+		SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
@@ -1848,8 +1951,7 @@ func (cp *CpAMM) Swap(
 	}
 
 	preInstructions := make([]solana.Instruction, 0, 2)
-	preInstructions = append(preInstructions, preparedTokenAccs.GetOrCreateAtaIxA,
-		preparedTokenAccs.GetOrCreateAtaIxB)
+	preInstructions = append(preInstructions, preparedTokenAccs.CreateATAIxns...)
 
 	if param.InputTokenMint.Equals(solana.WrappedSol) {
 		wrapSOLIx := helpers.WrapSOLInstruction(
@@ -1895,7 +1997,44 @@ func (cp *CpAMM) Swap(
 		CpAMMProgramId,
 	)
 
-	currentIx, err := swapPtr.ValidateAndBuild()
+	// swapPtr := cp_amm.NewSwapInstructionBuilder().
+	// 	SetParams(cp_amm.SwapParameters{
+	// 		AmountIn:         param.AmountIn,
+	// 		MinimumAmountOut: param.MinimumAmountOut,
+	// 	}).
+	// 	SetPoolAuthorityAccount(cp.poolAuthority).
+	// 	SetPoolAccount(param.Pool).
+	// 	SetInputTokenAccountAccount(preparedTokenAccs.TokenAAta).
+	// 	SetOutputTokenAccountAccount(preparedTokenAccs.TokenBAta).
+	// 	SetTokenAVaultAccount(param.TokenAVault).
+	// 	SetTokenBVaultAccount(param.TokenBVault).
+	// 	SetTokenAMintAccount(param.TokenAMint).
+	// 	SetTokenBMintAccount(param.TokenBMint).
+	// 	SetPayerAccount(param.Payer).
+	// 	SetTokenAProgramAccount(param.TokenAProgram).
+	// 	SetTokenBProgramAccount(param.TokenBProgram).
+	// 	SetProgramAccount(CpAMMProgramId)
+
+	// if param.ReferralTokenAccount.IsZero() {
+	// 	swapPtr.AccountMetaSlice[11] = nil
+	// } else {
+	// 	swapPtr.SetReferralTokenAccountAccount(param.ReferralTokenAccount)
+	// }
+	// if param.ReferralTokenAccount.IsZero() {
+	// 	// drop slot 11 completely (indexing starts at 0)
+	// 	slice := swapPtr.AccountMetaSlice
+	// 	swapPtr.AccountMetaSlice = append(slice[:11], slice[12:]...)
+	// } else {
+	// 	swapPtr.SetReferralTokenAccountAccount(param.ReferralTokenAccount)
+	// }
+
+	eventAuthPDA, _, err := swapPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	currentIx, err := swapPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
@@ -1910,9 +2049,8 @@ func (cp *CpAMM) Swap(
 
 func (cp *CpAMM) LockPosition(
 	param types.LockPositionParams,
-) ([]solana.Instruction, error) {
-
-	x, err := cp_amm.NewLockPositionInstruction(
+) (*cp_amm.Instruction, error) {
+	lockPositionPtr := cp_amm.NewLockPositionInstruction(
 		cp_amm.VestingParameters{
 			CliffPoint:           param.CliffPoint,
 			PeriodFrequency:      param.PeriodFrequency,
@@ -1929,20 +2067,21 @@ func (cp *CpAMM) LockPosition(
 		solana.SystemProgramID,
 		solana.PublicKey{},
 		CpAMMProgramId,
-	).ValidateAndBuild()
+	)
+	eventAuthPDA, _, err := lockPositionPtr.FindEventAuthorityAddress()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
 	}
 
-	return []solana.Instruction{x}, nil
+	return lockPositionPtr.SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
+
 }
 
 // PermanentLockPosition builds a transaction to permanently lock a position.
 func (cp *CpAMM) PermanentLockPosition(
 	param types.PermanentLockParams,
-) ([]solana.Instruction, error) {
-
-	x, err := cp_amm.NewPermanentLockPositionInstruction(
+) (*cp_amm.Instruction, error) {
+	permanentLockPositionPtr := cp_amm.NewPermanentLockPositionInstruction(
 		param.UnlockedLiquidity,
 		param.Pool,
 		param.Position,
@@ -1950,12 +2089,13 @@ func (cp *CpAMM) PermanentLockPosition(
 		param.Owner,
 		solana.PublicKey{},
 		CpAMMProgramId,
-	).ValidateAndBuild()
+	)
+	eventAuthPDA, _, err := permanentLockPositionPtr.FindEventAuthorityAddress()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
 	}
 
-	return []solana.Instruction{x}, nil
+	return permanentLockPositionPtr.SetEventAuthorityAccount(eventAuthPDA).ValidateAndBuild()
 }
 
 // RefreshVesting builds a transaction to refresh vesting status of a position.
@@ -2021,8 +2161,7 @@ func (cp *CpAMM) RemoveAllLiquidityAndClosePosition(
 
 	// 1. refresh vesting if vesting account provided
 	preInstructions := make([]solana.Instruction, 0, 3)
-	preInstructions = append(preInstructions, preparedTokenAccs.GetOrCreateAtaIxA,
-		preparedTokenAccs.GetOrCreateAtaIxB)
+	preInstructions = append(preInstructions, preparedTokenAccs.CreateATAIxns...)
 	if len(param.Vestings) > 0 {
 		vestingAccouts := make([]solana.PublicKey, len(param.Vestings))
 		for i, v := range param.Vestings {
@@ -2044,7 +2183,7 @@ func (cp *CpAMM) RemoveAllLiquidityAndClosePosition(
 	}
 
 	// 2. claim fee, remove liquidity and close position
-	liquidatePositionInstructions := cp.buildRemoveAllLiquidityInstruction(
+	liquidatePositionInstructions, err := cp.buildRemoveAllLiquidityInstruction(
 		types.BuildRemoveAllLiquidityInstructionParams{
 			PoolAuthority:         cp.poolAuthority,
 			Owner:                 param.Owner,
@@ -2057,6 +2196,9 @@ func (cp *CpAMM) RemoveAllLiquidityAndClosePosition(
 			TokenBAmountThreshold: param.TokenBAmountThreshold,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	ixns := make([]solana.Instruction, 0, len(preInstructions)+1+len(postInstructions))
 	ixns = append(ixns, preInstructions...)
@@ -2113,8 +2255,7 @@ func (cp *CpAMM) MergePosition(
 	}
 
 	ixns := make([]solana.Instruction, 0, 3)
-	ixns = append(ixns, preparedTokenAccs.GetOrCreateAtaIxA,
-		preparedTokenAccs.GetOrCreateAtaIxB)
+	ixns = append(ixns, preparedTokenAccs.CreateATAIxns...)
 
 	positionBLiquidityDelta := param.PositionBState.UnlockedLiquidity.BigInt()
 	// 1. refresh vesting position B if vesting account provided
@@ -2172,12 +2313,12 @@ func (cp *CpAMM) MergePosition(
 			MaxAmountTokenA: tokenAWithdrawAmount,
 			MaxAmountTokenB: tokenBWithdrawAmount,
 			SqrtMaxPrice:    param.PoolState.SqrtMaxPrice.BigInt(),
-			SqrtPrice:       param.PoolState.SqrtPrice.BigInt(),
 			SqrtMinPrice:    param.PoolState.SqrtMinPrice.BigInt(),
+			SqrtPrice:       param.PoolState.SqrtPrice.BigInt(),
 		},
 	)
 
-	newLiquidityDeltaU128, _ := helpers.BigIntToUint128(newLiquidityDelta)
+	newLiquidityDeltaU128 := helpers.MustBigIntToUint128(newLiquidityDelta)
 
 	// 2. claim fee, remove liquidity and close position
 	liquidatePositionInstructions, err := cp.buildLiquidatePositionInstruction(
@@ -2206,7 +2347,7 @@ func (cp *CpAMM) MergePosition(
 	ixns = append(ixns, tempIxns...)
 
 	// 3. add liquidity from position B to positon A
-	addLiquidityInstruction := cp.buildAddLiquidityInstruction(
+	addLiquidityInstruction, err := cp.buildAddLiquidityInstruction(
 		types.BuildAddLiquidityParams{
 			Owner:                 param.Owner,
 			Position:              param.PositionA,
@@ -2224,6 +2365,9 @@ func (cp *CpAMM) MergePosition(
 			TokenBAmountThreshold: param.TokenBAmountAddLiquidityThreshold,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	ixns = append(ixns, addLiquidityInstruction)
 
@@ -2491,7 +2635,7 @@ func (cp *CpAMM) ClaimPositionFee(
 		return nil, err
 	}
 
-	claimPositionFeeIx := cp.buildClaimPositionFeeInstruction(
+	claimPositionFeeIx, err := cp.buildClaimPositionFeeInstruction(
 		types.ClaimPositionFeeInstructionParams{
 			Owner:              param.Owner,
 			PoolAuthority:      cp.poolAuthority,
@@ -2508,6 +2652,9 @@ func (cp *CpAMM) ClaimPositionFee(
 			TokenBProgram:      param.TokenBProgram,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	ixns := make([]solana.Instruction, 0, len(out.PreInstructions)+1+len(out.PostInstructions))
 	ixns = append(ixns, out.PreInstructions...)
@@ -2568,7 +2715,7 @@ func (cp *CpAMM) ClaimPositionFee2(
 		postInstructions = append(postInstructions, closeWrappedSOLIx)
 	}
 
-	claimPositionFeeIx := cp.buildClaimPositionFeeInstruction(
+	claimPositionFeeIx, err := cp.buildClaimPositionFeeInstruction(
 		types.ClaimPositionFeeInstructionParams{
 			Owner:              param.Owner,
 			PoolAuthority:      cp.poolAuthority,
@@ -2587,7 +2734,7 @@ func (cp *CpAMM) ClaimPositionFee2(
 	)
 
 	ixns := make([]solana.Instruction, 0, 2+1+len(postInstructions))
-	ixns = append(ixns, preparedTokenAccs.GetOrCreateAtaIxA, preparedTokenAccs.GetOrCreateAtaIxB)
+	ixns = append(ixns, preparedTokenAccs.CreateATAIxns...)
 	ixns = append(ixns, claimPositionFeeIx)
 	ixns = append(ixns, postInstructions...)
 

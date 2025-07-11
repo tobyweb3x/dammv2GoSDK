@@ -76,7 +76,7 @@ type ClaimPositionFeeInstructionParams struct {
 	TokenBProgram      solana.PublicKey
 }
 
-type ClosePositionInstructionParams struct {
+type ClosePositionParams struct {
 	Owner              solana.PublicKey
 	PoolAuthority      solana.PublicKey
 	Pool               solana.PublicKey
@@ -280,7 +280,7 @@ type BaseFee struct {
 	NumberOfPeriod    uint64
 	PeriodFrequency   *big.Int
 	ReductionFactor   *big.Int
-	FeeSchedulerMode  uint8
+	FeeSchedulerMode  FeeSchedulerMode
 }
 
 type InitializeCustomizeablePoolParams struct {
@@ -368,20 +368,21 @@ type RemoveLiquidityParams struct {
 }
 
 type RemoveAllLiquidityParams struct {
-	Owner                 solana.PublicKey
-	Position              solana.PublicKey
-	Pool                  solana.PublicKey
-	PositionNftAccount    solana.PublicKey
-	TokenAAmountThreshold uint64
-	TokenBAmountThreshold uint64
-	TokenAMint            solana.PublicKey
-	TokenBMint            solana.PublicKey
-	TokenAVault           solana.PublicKey
-	TokenBVault           solana.PublicKey
-	TokenAProgram         solana.PublicKey
-	TokenBProgram         solana.PublicKey
-	Vestings              []Vesting
-	CurrentPoint          uint64
+	// Owner                 solana.PublicKey
+	// Position              solana.PublicKey
+	// Pool                  solana.PublicKey
+	// PositionNftAccount    solana.PublicKey
+	// TokenAAmountThreshold uint64
+	// TokenBAmountThreshold uint64
+	// TokenAMint            solana.PublicKey
+	// TokenBMint            solana.PublicKey
+	// TokenAVault           solana.PublicKey
+	// TokenBVault           solana.PublicKey
+	// TokenAProgram         solana.PublicKey
+	// TokenBProgram         solana.PublicKey
+	AddLiquidityParams
+	Vestings     []Vesting
+	CurrentPoint uint64
 }
 
 type SwapParams struct {

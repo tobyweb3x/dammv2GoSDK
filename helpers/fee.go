@@ -4,6 +4,9 @@ import (
 	"dammv2GoSDK/constants"
 	"dammv2GoSDK/maths"
 	"dammv2GoSDK/types"
+	"errors"
+	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 )
@@ -105,10 +108,14 @@ func GetBaseFeeNumerator(
 		new(big.Int).Lsh(reductionFactor, constants.ScaleOffset),
 		big.NewInt(constants.BasisPointMax),
 	)
+
 	base := new(big.Int).Sub(maths.One, bps)
 	result := maths.Pow(base, period)
 
-	return new(big.Int).Rsh(new(big.Int).Mul(cliffFeeNumerator, result), constants.ScaleOffset)
+	return new(big.Int).Rsh(
+		new(big.Int).Mul(cliffFeeNumerator, result),
+		constants.ScaleOffset,
+	)
 }
 
 // GetDynamicFeeNumerator calculates the dynamic fee numerator based on market volatility metrics, returns the calculated dynamic fee numerator.
@@ -230,4 +237,167 @@ func GetSwapAmount(
 	}{
 		AmountOut: amountOut, TotalFee: totalFee, NextSqrtPrice: nextSqrtPrice,
 	}
+}
+
+func GetBaseFeeParams(
+	maxBaseFeeBps, minBaseFeeBps uint64,
+	feeSchedulerMode types.FeeSchedulerMode,
+	numberOfPeriod, totalDuration uint64,
+) (types.BaseFee, error) {
+	if maxBaseFeeBps == minBaseFeeBps {
+		if numberOfPeriod != 0 || totalDuration != 0 {
+			return types.BaseFee{}, errors.New("numberOfPeriod and totalDuration must both be zero")
+		}
+
+		return types.BaseFee{CliffFeeNumerator: BpsToFeeNumerator(maxBaseFeeBps)}, nil
+	}
+
+	if numberOfPeriod <= 0 {
+		return types.BaseFee{}, errors.New("total periods must be greater than zero")
+	}
+
+	if hold := FeeNumeratorToBps(big.NewInt(constants.MaxFeeNumerator)); maxBaseFeeBps > hold {
+		return types.BaseFee{}, fmt.Errorf("maxBaseFeeBps %d bps exceeds maximum allowed value of %d bps",
+			maxBaseFeeBps, hold)
+	}
+
+	if minBaseFeeBps > maxBaseFeeBps {
+		return types.BaseFee{}, errors.New("minBaseFee bps must be less than or equal to maxBaseFee bps")
+	}
+
+	if numberOfPeriod == 0 || totalDuration == 0 {
+		return types.BaseFee{}, errors.New("numberOfPeriod and totalDuration must both greater than zero")
+	}
+
+	maxBaseFeeNumerator, minBaseFeeNumerator, periodFrequency :=
+		BpsToFeeNumerator(maxBaseFeeBps),
+		BpsToFeeNumerator(minBaseFeeBps),
+		new(big.Int).Div( // TODO: big.Int not needed if these numbers would be small (not overflow)
+			new(big.Int).SetUint64(totalDuration),
+			new(big.Int).SetUint64(numberOfPeriod),
+		)
+
+	reductionFactor := big.NewInt(0)
+	if feeSchedulerMode == types.Linear {
+		reductionFactor = new(big.Int).Div(
+			new(big.Int).Sub(maxBaseFeeNumerator, minBaseFeeNumerator),
+			new(big.Int).SetUint64(numberOfPeriod),
+		)
+	} else {
+		ratio := float64(minBaseFeeNumerator.Uint64()) / float64(maxBaseFeeNumerator.Uint64())
+		decayBase := math.Pow(ratio, 1.0/float64(numberOfPeriod))
+		reduction := float64(constants.BasisPointMax) * (1 - decayBase)
+
+		reductionFactor = big.NewInt(int64(reduction))
+		// decayBase := new(big.Int).Exp(
+		// 	new(big.Int).Div(minBaseFeeNumerator, maxBaseFeeNumerator),
+		// 	new(big.Int).SetUint64(1/numberOfPeriod),
+		// 	new(big.Int),
+		// )
+		// reductionFactor = new(big.Int).Mul(
+		// 	new(big.Int).SetUint64(constants.BasisPointMax),
+		// 	new(big.Int).Sub(big.NewInt(1), decayBase),
+		// )
+	}
+
+	return types.BaseFee{
+		CliffFeeNumerator: maxBaseFeeNumerator,
+		NumberOfPeriod:    numberOfPeriod,
+		PeriodFrequency:   periodFrequency,
+		ReductionFactor:   reductionFactor,
+		FeeSchedulerMode:  feeSchedulerMode,
+	}, nil
+}
+
+// Converts basis points (bps) to a fee numerator and returns the equivalent fee numerator.
+// 1 bps = 0.01% = 0.0001 in decimal
+//
+// bps - The value in basis points [1-10_000]
+func BpsToFeeNumerator(bps uint64) *big.Int {
+	return new(big.Int).Div(
+		new(big.Int).SetUint64(bps*constants.FeeDenominator),
+		big.NewInt(constants.BasisPointMax),
+	)
+}
+
+func FeeNumeratorToBps(feeNumerator *big.Int) uint64 {
+	return new(big.Int).Div(
+		new(big.Int).Mul(feeNumerator, big.NewInt(constants.BasisPointMax)),
+		big.NewInt(constants.FeeDenominator),
+	).Uint64()
+}
+
+func GetDynamicFeeParams(
+	baseFeeBps uint64, maxPriceChangeBps uint64,
+) (types.DynamicFee, error) {
+	if maxPriceChangeBps == 0 {
+		maxPriceChangeBps = constants.MaxPriceChangeBpsDefault // default 15%
+	}
+
+	if maxPriceChangeBps > constants.MaxPriceChangeBpsDefault {
+		return types.DynamicFee{}, fmt.Errorf("maxPriceChangeBps (%d bps) must be less than or equal to %d", maxPriceChangeBps, constants.MaxPriceChangeBpsDefault)
+	}
+
+	priceRatio := new(big.Float).Add(
+		new(big.Float).Quo(
+			new(big.Float).SetUint64(maxPriceChangeBps),
+			new(big.Float).SetUint64(constants.BasisPointMax),
+		),
+		big.NewFloat(1),
+	)
+
+	twoTo64, _ := new(big.Float).SetPrec(256).SetString("18446744073709551616") // 2^64
+	sqrtPriceRatio := new(big.Float).Mul(
+		new(big.Float).Sqrt(priceRatio),
+		twoTo64,
+	)
+
+	if !sqrtPriceRatio.IsInt() {
+		return types.DynamicFee{}, errors.New("sqrtPriceRatio cannot be roundedOff")
+	}
+
+	sqrtPriceRatioFloored, _ := sqrtPriceRatio.Int(nil)
+
+	deltaBinId := new(big.Int).Div(
+		new(big.Int).Sub(sqrtPriceRatioFloored, big.NewInt(1)),
+		constants.BinStepBpsU128Default,
+	)
+	deltaBinId.Mul(deltaBinId, big.NewInt(2))
+
+	maxVolatilityAccumulator := new(big.Int).Mul(deltaBinId, big.NewInt(constants.BasisPointMax))
+
+	squareVfaBin := new(big.Int).Mul(maxVolatilityAccumulator, big.NewInt(constants.BinStepBpsDefault))
+	squareVfaBin.Mul(squareVfaBin, squareVfaBin)
+
+	baseFeeNumerator := BpsToFeeNumerator(baseFeeBps)
+
+	maxDynamicFeeNumerator := new(big.Int).Div(
+		new(big.Int).Mul(baseFeeNumerator, big.NewInt(20)), // default max dynamic fee = 20% of base fee.
+		big.NewInt(100),
+	)
+
+	vFee := new(big.Int).Sub(
+		new(big.Int).Mul(maxDynamicFeeNumerator, big.NewInt(100_000_000_000)),
+		big.NewInt(99_999_999_999),
+	)
+
+	variableFeeControl := new(big.Int).Div(vFee, squareVfaBin)
+
+	if !maxVolatilityAccumulator.IsInt64() {
+		return types.DynamicFee{}, errors.New("maxVolatilityAccumulator could not fit into uint64")
+	}
+
+	if !variableFeeControl.IsInt64() {
+		return types.DynamicFee{}, errors.New("variableFeeControl could not fit into uint64")
+	}
+
+	return types.DynamicFee{
+		BinStep:                  constants.BinStepBpsDefault,
+		BinStepU128:              constants.BinStepBpsU128Default,
+		FilterPeriod:             constants.DynamicFeeFilterPeriod,
+		DecayPeriod:              constants.DynamicFeeDecayPeriod,
+		ReductionFactor:          constants.DynamicFeeReductionFactor,
+		MaxVolatilityAccumulator: maxVolatilityAccumulator.Uint64(),
+		VariableFeeControl:       variableFeeControl.Uint64(),
+	}, nil
 }
