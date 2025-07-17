@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
+	"testing"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	ata "github.com/gagliardetto/solana-go/programs/associated-token-account"
+	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -32,6 +35,7 @@ type TestActors struct {
 }
 
 func SetupTestContext(
+	t *testing.T,
 	conn *rpc.Client,
 	wsClient *ws.Client,
 	rootKeypair solana.PrivateKey,
@@ -46,52 +50,44 @@ func SetupTestContext(
 		if _, err := conn.RequestAirdrop(
 			context.Background(),
 			rootKeypair.PublicKey(),
-			100_000*solana.LAMPORTS_PER_SOL,
+			9_998*solana.LAMPORTS_PER_SOL,
 			rpc.CommitmentFinalized,
 		); err != nil {
-			return nil, fmt.Errorf("error: RequestAirdrop - %s", err.Error())
+			return nil, fmt.Errorf("error: RequestAirdrop - \n%s", err.Error())
 		}
 
-		fmt.Println("got airdrop")
+		// t.Log("got airdrop ✅")
 	}
 
-	// fund actors
+	// fund actors & create token
 	{
-		pubkeys := []solana.PublicKey{
-			actors.Admin.PublicKey(),
-			actors.Payer.PublicKey(),
-			actors.PoolCreator.PublicKey(),
-			actors.User.PublicKey(),
-			actors.Funder.PublicKey(),
-			actors.Operator.PublicKey(),
-			actors.Partner.PublicKey(),
+		var fundInxs []solana.Instruction
+		// fund actors instructions
+		{
+			pubkeys := []solana.PublicKey{
+				actors.Admin.PublicKey(),
+				actors.Payer.PublicKey(),
+				actors.PoolCreator.PublicKey(),
+				actors.User.PublicKey(),
+				actors.Funder.PublicKey(),
+				actors.Operator.PublicKey(),
+				actors.Partner.PublicKey(),
+			}
+
+			ixns := make([]solana.Instruction, 0, len(pubkeys))
+
+			for _, pubkey := range pubkeys {
+				ix := system.NewTransferInstruction(
+					1_000*solana.LAMPORTS_PER_SOL,
+					rootKeypair.PublicKey(),
+					pubkey,
+				).Build()
+				ixns = append(ixns, ix)
+			}
+
+			fundInxs = ixns
 		}
 
-		ixns := make([]solana.Instruction, 0, len(pubkeys))
-
-		for _, pubkey := range pubkeys {
-			ix := system.NewTransferInstruction(
-				1_000*solana.LAMPORTS_PER_SOL,
-				rootKeypair.PublicKey(),
-				pubkey,
-			).Build()
-			ixns = append(ixns, ix)
-		}
-
-		if _, err := SendAndConfirmTxn(
-			conn,
-			wsClient,
-			ixns,
-			rootKeypair,
-		); err != nil {
-			return nil, err
-		}
-
-		fmt.Println("actors funded")
-	}
-
-	// create token
-	{
 		if token2022 {
 
 		} else {
@@ -129,10 +125,14 @@ func SetupTestContext(
 				ixns = append(ixns, createIx, initIx)
 			}
 
+			combinedIxns := make([]solana.Instruction, 0, len(fundInxs)+len(ixns))
+			combinedIxns = append(combinedIxns, fundInxs...)
+			combinedIxns = append(combinedIxns, ixns...)
+
 			if _, err := SendAndConfirmTxn(
 				conn,
 				wsClient,
-				ixns,
+				combinedIxns,
 				rootKeypair,
 				actors.TokenAMint,
 				actors.TokenBMint,
@@ -142,7 +142,7 @@ func SetupTestContext(
 			}
 		}
 
-		fmt.Println("tokens created")
+		// t.Log("actors funded & tokens created  ✅")
 	}
 
 	// mint token
@@ -206,9 +206,8 @@ func SetupTestContext(
 			return nil, err
 		}
 
-		fmt.Println("tokens minted")
+		// t.Log("tokens minted  ✅")
 	}
-
 	return actors, nil
 }
 
@@ -244,6 +243,17 @@ func GetPool(
 	}
 
 	return &account, nil
+}
+
+func ExecuteTransaction(conn *rpc.Client,
+	wsClient *ws.Client,
+	ixns []solana.Instruction,
+	payer solana.PrivateKey,
+	signers ...solana.PrivateKey,
+) (solana.Signature, error) {
+	computebudgetIx := computebudget.NewSetComputeUnitPriceInstruction(400_000).Build()
+	newIxns := slices.AppendSeq([]solana.Instruction{computebudgetIx}, slices.Values(ixns))
+	return SendAndConfirmTxn(conn, wsClient, newIxns, payer, signers...)
 }
 
 func SendAndConfirmTxn(
@@ -342,6 +352,7 @@ func CreateDynamicConfig(
 	poolCreatorAuthority solana.PublicKey,
 ) (solana.PublicKey, error) {
 	config := dammv2gosdk.DeriveConfigAddress(index)
+
 	createDynamicConfigPtr := cp_amm.NewCreateDynamicConfigInstruction(
 		index,
 		cp_amm.DynamicConfigParameters{
@@ -357,12 +368,15 @@ func CreateDynamicConfig(
 	if err != nil {
 		return solana.PublicKey{}, fmt.Errorf("err deriving eventAuthPDA: %w", err)
 	}
+
 	// configAdddressPDA, _, err := createDynamicConfigPtr.FindConfigAddress()
 	// if err != nil {
 	// 	return solana.PublicKey{}, fmt.Errorf("err deriving configAdddressPDA: %w", err)
 	// }
+	// createDynamicConfigPtr.SetConfigAccount(configAdddressPDA)
 
-	ix, err := createDynamicConfigPtr.SetEventAuthorityAccount(eventAuthPDA).
+	ix, err := createDynamicConfigPtr.
+		SetEventAuthorityAccount(eventAuthPDA).
 		ValidateAndBuild()
 	if err != nil {
 		return solana.PublicKey{}, err

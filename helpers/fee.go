@@ -277,7 +277,7 @@ func GetBaseFeeParams(
 			new(big.Int).SetUint64(numberOfPeriod),
 		)
 
-	reductionFactor := big.NewInt(0)
+	var reductionFactor *big.Int
 	if feeSchedulerMode == types.Linear {
 		reductionFactor = new(big.Int).Div(
 			new(big.Int).Sub(maxBaseFeeNumerator, minBaseFeeNumerator),
@@ -289,15 +289,6 @@ func GetBaseFeeParams(
 		reduction := float64(constants.BasisPointMax) * (1 - decayBase)
 
 		reductionFactor = big.NewInt(int64(reduction))
-		// decayBase := new(big.Int).Exp(
-		// 	new(big.Int).Div(minBaseFeeNumerator, maxBaseFeeNumerator),
-		// 	new(big.Int).SetUint64(1/numberOfPeriod),
-		// 	new(big.Int),
-		// )
-		// reductionFactor = new(big.Int).Mul(
-		// 	new(big.Int).SetUint64(constants.BasisPointMax),
-		// 	new(big.Int).Sub(big.NewInt(1), decayBase),
-		// )
 	}
 
 	return types.BaseFee{
@@ -357,12 +348,13 @@ func GetDynamicFeeParams(
 	}
 
 	sqrtPriceRatioFloored, _ := sqrtPriceRatio.Int(nil)
-
-	deltaBinId := new(big.Int).Div(
-		new(big.Int).Sub(sqrtPriceRatioFloored, big.NewInt(1)),
-		constants.BinStepBpsU128Default,
+	deltaBinId := new(big.Int).Mul(
+		new(big.Int).Div(
+			new(big.Int).Sub(sqrtPriceRatioFloored, maths.One),
+			constants.BinStepBpsU128Default,
+		),
+		big.NewInt(2),
 	)
-	deltaBinId.Mul(deltaBinId, big.NewInt(2))
 
 	maxVolatilityAccumulator := new(big.Int).Mul(deltaBinId, big.NewInt(constants.BasisPointMax))
 

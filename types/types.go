@@ -368,18 +368,6 @@ type RemoveLiquidityParams struct {
 }
 
 type RemoveAllLiquidityParams struct {
-	// Owner                 solana.PublicKey
-	// Position              solana.PublicKey
-	// Pool                  solana.PublicKey
-	// PositionNftAccount    solana.PublicKey
-	// TokenAAmountThreshold uint64
-	// TokenBAmountThreshold uint64
-	// TokenAMint            solana.PublicKey
-	// TokenBMint            solana.PublicKey
-	// TokenAVault           solana.PublicKey
-	// TokenBVault           solana.PublicKey
-	// TokenAProgram         solana.PublicKey
-	// TokenBProgram         solana.PublicKey
 	AddLiquidityParams
 	Vestings     []Vesting
 	CurrentPoint uint64

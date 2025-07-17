@@ -561,6 +561,8 @@ func (cp *CpAMM) setupFeeClaimAccounts(
 	}, nil
 }
 
+//// ANCHOR: GETTER/FETCHER FUNCTIONS //////
+
 // FetchConfigState fetches the Config state of the program.
 func (cp *CpAMM) FetchConfigState(ctx context.Context, config solana.PublicKey) (*cp_amm.ConfigAccount, error) {
 	configState, err := anchor.NewPgAccounts(
@@ -726,6 +728,7 @@ func (cp *CpAMM) GetPositionsByUser(
 	if err != nil {
 		return nil, err
 	}
+
 	if len(userPositionAccounts) == 0 {
 		return nil, errors.New("empty result from rpc call")
 	}
@@ -2015,9 +2018,11 @@ func (cp *CpAMM) Swap(
 	// 	SetTokenBProgramAccount(param.TokenBProgram).
 	// 	SetProgramAccount(CpAMMProgramId)
 
-	// if param.ReferralTokenAccount.IsZero() {
-	// 	swapPtr.AccountMetaSlice[11] = nil
-	// } else {
+	if param.ReferralTokenAccount.IsZero() {
+		swapPtr.AccountMetaSlice[11] = nil
+		fmt.Println("it hit here")
+	}
+
 	// 	swapPtr.SetReferralTokenAccountAccount(param.ReferralTokenAccount)
 	// }
 	// if param.ReferralTokenAccount.IsZero() {
@@ -2033,7 +2038,7 @@ func (cp *CpAMM) Swap(
 		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
 	}
 
-	currentIx, err := swapPtr.SetEventAuthorityAccount(eventAuthPDA).
+	swapIx, err := swapPtr.SetEventAuthorityAccount(eventAuthPDA).
 		ValidateAndBuild()
 	if err != nil {
 		return nil, err
@@ -2041,7 +2046,7 @@ func (cp *CpAMM) Swap(
 
 	ixns := make([]solana.Instruction, 0, len(preInstructions)+1+len(postInstructions))
 	ixns = append(ixns, preInstructions...)
-	ixns = append(ixns, currentIx)
+	ixns = append(ixns, swapIx)
 	ixns = append(ixns, postInstructions...)
 
 	return ixns, nil
@@ -2058,7 +2063,7 @@ func (cp *CpAMM) LockPosition(
 			LiquidityPerPeriod:   param.LiquidityPerPeriod,
 			NumberOfPeriod:       param.NumberOfPeriod,
 		},
-		cp.poolAuthority,
+		param.Pool,
 		param.Position,
 		param.VestingAccount,
 		param.PositionNftAccount,
@@ -2258,6 +2263,7 @@ func (cp *CpAMM) MergePosition(
 	ixns = append(ixns, preparedTokenAccs.CreateATAIxns...)
 
 	positionBLiquidityDelta := param.PositionBState.UnlockedLiquidity.BigInt()
+
 	// 1. refresh vesting position B if vesting account provided
 	if len(param.PositionBVestings) > 0 {
 		vestingAccouts := make([]solana.PublicKey, 0, len(param.PositionBVestings))
@@ -2318,7 +2324,10 @@ func (cp *CpAMM) MergePosition(
 		},
 	)
 
-	newLiquidityDeltaU128 := helpers.MustBigIntToUint128(newLiquidityDelta)
+	newLiquidityDeltaU128, err := helpers.BigIntToUint128(newLiquidityDelta)
+	if err != nil {
+		return nil, err
+	}
 
 	// 2. claim fee, remove liquidity and close position
 	liquidatePositionInstructions, err := cp.buildLiquidatePositionInstruction(
@@ -2349,10 +2358,10 @@ func (cp *CpAMM) MergePosition(
 	// 3. add liquidity from position B to positon A
 	addLiquidityInstruction, err := cp.buildAddLiquidityInstruction(
 		types.BuildAddLiquidityParams{
-			Owner:                 param.Owner,
+			Pool:                  param.PositionBState.Pool,
 			Position:              param.PositionA,
 			PositionNftAccount:    param.PositionANftAccount,
-			LiquidityDelta:        newLiquidityDeltaU128,
+			Owner:                 param.Owner,
 			TokenAAccount:         preparedTokenAccs.TokenAAta,
 			TokenBAccount:         preparedTokenAccs.TokenBAta,
 			TokenAMint:            param.PoolState.TokenAMint,
@@ -2361,6 +2370,7 @@ func (cp *CpAMM) MergePosition(
 			TokenBVault:           param.PoolState.TokenBVault,
 			TokenAProgram:         tokenAProgram,
 			TokenBProgram:         tokenBProgram,
+			LiquidityDelta:        newLiquidityDeltaU128,
 			TokenAAmountThreshold: param.TokenAAmountAddLiquidityThreshold,
 			TokenBAmountThreshold: param.TokenBAmountAddLiquidityThreshold,
 		},
@@ -2732,6 +2742,9 @@ func (cp *CpAMM) ClaimPositionFee2(
 			TokenBProgram:      param.TokenBProgram,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	ixns := make([]solana.Instruction, 0, 2+1+len(postInstructions))
 	ixns = append(ixns, preparedTokenAccs.CreateATAIxns...)
