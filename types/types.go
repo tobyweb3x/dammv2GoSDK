@@ -168,6 +168,7 @@ type DynamicFeeParams struct {
 type FeeMode struct {
 	FeeOnInput   bool
 	FeesOnTokenA bool
+	HasReferral  bool
 }
 type GetQuoteParams struct {
 	InAmount        *big.Int
@@ -515,4 +516,34 @@ type ClaimRewardParams struct {
 	PositionNftAccount solana.PublicKey
 	RewardIndex        uint8
 	FeePayer           solana.PublicKey
+}
+
+type SwapAmount struct {
+	OutputAmount, NextSqrtPrice *big.Int
+}
+type SwapResult struct {
+	OutputAmount  *big.Int
+	NextSqrtPrice *big.Int
+	LPFee         *big.Int
+	ProtocolFee   *big.Int
+	ReferralFee   *big.Int
+	PartnerFee    *big.Int
+}
+
+type GetQuoteExactOutParams struct {
+	OutAmount       *big.Int
+	OutputTokenMint solana.PublicKey
+	Slippage        float64
+	PoolState       *cp_amm.PoolAccount
+	CurrentTime     int64
+	CurrentSlot     uint64
+	InputTokenInfo  *TokenEpochInfo
+	OutputTokenInfo *TokenEpochInfo
+}
+
+type QuoteExactOutResult struct {
+	SwapResult     SwapResult
+	InputAmount    *big.Int
+	MaxInputAmount *big.Int
+	PriceImpact    float64
 }

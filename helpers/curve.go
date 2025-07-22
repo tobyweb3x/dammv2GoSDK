@@ -3,6 +3,7 @@ package helpers
 import (
 	"dammv2GoSDK/constants"
 	"dammv2GoSDK/types"
+	"errors"
 	"math/big"
 )
 
@@ -109,9 +110,9 @@ func GetAmountAFromLiquidityDelta(
 
 // GetAmountBFromLiquidityDelta
 //
-// L = Δb / (√P_upper - √P_lower)
+//	L = Δb / (√P_upper - √P_lower)
 //
-// Δb = L * (√P_upper - √P_lower)
+//	Δb = L * (√P_upper - √P_lower)
 func GetAmountBFromLiquidityDelta(
 	liquidity, currentSqrtPrice, minSqrtPrice *big.Int,
 	rounding types.Rounding,
@@ -129,4 +130,74 @@ func GetAmountBFromLiquidityDelta(
 	}
 
 	return new(big.Int).Rsh(result, 128) // result >> 128
+}
+
+// GetNextSqrtPriceFromAmountBRoundingUp
+//   - `√P' = √P - Δy / L`
+func GetNextSqrtPriceFromAmountBRoundingUp(
+	sqrtPrice, liquidity, amount *big.Int,
+) (*big.Int, error) {
+
+	quotient := new(big.Int).Quo(
+		new(big.Int).Sub(
+			new(big.Int).Add(new(big.Int).Lsh(amount, 128), liquidity),
+			big.NewInt(1),
+		),
+		liquidity,
+	)
+	result := new(big.Int).Sub(sqrtPrice, quotient)
+	if result.Sign() < 0 {
+		return nil, errors.New("sqrt price cannot be negative")
+	}
+
+	return result, nil
+}
+
+// GetNextSqrtPriceFromAmountARoundingDown
+//
+//	√P' = √P * L / (L - Δx * √P)
+func GetNextSqrtPriceFromAmountARoundingDown(
+	sqrtPrice, liquidity, amount *big.Int,
+) (*big.Int, error) {
+	if amount.Sign() == 0 {
+		return sqrtPrice, nil
+	}
+
+	denominator := new(big.Int).Sub(
+		liquidity,
+		new(big.Int).Mul(amount, sqrtPrice),
+	)
+
+	if denominator.Sign() <= 0 {
+		return nil, errors.New("invalid denominator in sqrt price calculation")
+	}
+
+	return new(big.Int).Quo(
+		new(big.Int).Mul(liquidity, sqrtPrice),
+		denominator,
+	), nil
+}
+
+func GetNextSqrtPriceFromOutput(
+	sqrtPrice, liquidity, outAmount *big.Int,
+	isB bool,
+) (*big.Int, error) {
+	if sqrtPrice.Sign() == 0 {
+		return nil, errors.New("sqrt price must be greater than 0")
+	}
+
+	if isB {
+		return GetNextSqrtPriceFromAmountBRoundingUp(
+			sqrtPrice,
+			liquidity,
+			outAmount,
+		)
+	}
+
+	return GetNextSqrtPriceFromAmountARoundingDown(
+		sqrtPrice,
+		liquidity,
+		outAmount,
+	)
+
 }

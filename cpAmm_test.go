@@ -580,6 +580,20 @@ func TestClaimFee2(t *testing.T) {
 			helpers.GetTokenProgram(poolState.TokenAFlag),
 			solana.PublicKey{},
 		)
+
+		// fundIx := system.NewTransferInstruction(
+		// 	10*1_000_000, // 10 tokens in micro-lamports (adjust if decimals are different)
+		// 	actors.Payer.PublicKey(),
+		// 	wsolATA,
+		// )
+
+		// // Sync WSOL balance
+		// syncIx := token2022.NewSyncNativeInstruction(
+		// 	wsolATA,
+		// 	helpers.GetTokenProgram(poolState.TokenBFlag),
+		// 	nil,
+		// )
+
 		swapBtoAIxns, err := ammInstance.Swap(
 			context.Background(),
 			types.SwapParams{
@@ -1779,8 +1793,6 @@ func TestMergePosition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err from GetPosition: %s", err.Error())
 	}
-
-
 
 	mergeIxns, err := ammInstance.MergePosition(
 		context.Background(),

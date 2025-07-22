@@ -14,9 +14,16 @@ const (
 	Exponential
 )
 
-type Rounding int
+type Rounding uint8
 
 const (
 	RoundingDown Rounding = iota
 	RoundingUp
+)
+
+type TradeDirection uint8
+
+const (
+	AtoB TradeDirection = iota
+	BtoA
 )

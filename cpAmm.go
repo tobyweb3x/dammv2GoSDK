@@ -955,6 +955,79 @@ func GetQuote(param types.GetQuoteParams) types.GetQuoteResult {
 	}
 }
 
+// GetQuoteExactOut calculates swap quote based on desired output amount and pool state.
+func GetQuoteExactOut(param types.GetQuoteExactOutParams) (types.QuoteExactOutResult, error) {
+
+	bToA := param.PoolState.TokenAMint.Equals(param.OutputTokenMint)
+	tradeDirection := types.AtoB
+	if bToA {
+		tradeDirection = types.BtoA
+	}
+
+	currentPoint := param.CurrentSlot
+	if param.PoolState.ActivationType != 0 {
+		currentPoint = uint64(param.CurrentTime)
+	}
+
+	// var dynamicFeeParams types.DynamicFeeParams
+	// if h := param.PoolState.PoolFees.DynamicFee; h.Initialized != 0 {
+	// 	dynamicFeeParams.VolatilityAccumulator = h.VolatilityAccumulator.BigInt()
+	// 	dynamicFeeParams.BinStep = h.BinStep
+	// 	dynamicFeeParams.VariableFeeControl = h.VariableFeeControl
+	// }
+
+	actualAmountOut := param.OutAmount
+	if h := param.OutputTokenInfo; h != nil {
+		actualAmountOut = helpers.CalculateTransferFeeExcludedAmount(
+			param.OutAmount,
+			h.Mint,
+			h.CurrentEpoch,
+		).Amount
+	}
+
+	feeMode := helpers.GetFeeMode(types.CollectFeeMode(param.PoolState.CollectFeeMode), bToA)
+
+	out, err := helpers.GetSwapResultFromOutAmount(
+		param.PoolState,
+		actualAmountOut,
+		feeMode,
+		tradeDirection,
+		currentPoint,
+	)
+	if err != nil {
+		return types.QuoteExactOutResult{}, err
+	}
+
+	actualInputAmount := out.InputAmount
+	if h := param.InputTokenInfo; h != nil {
+		actualInputAmount = helpers.CalculateTransferFeeExcludedAmount(
+			out.InputAmount,
+			h.Mint,
+			h.CurrentEpoch,
+		).Amount
+	}
+
+	slippageFactor := 1 + (param.Slippage / 100.0)
+	maxInputFloat := new(big.Float).Mul(
+		new(big.Float).SetInt(actualInputAmount),
+		big.NewFloat(slippageFactor),
+	)
+
+	maxInputAmount, _ := maxInputFloat.Int(nil)
+
+	priceImpact := helpers.GetPriceImpact(
+		out.SwapResult.NextSqrtPrice,
+		param.PoolState.SqrtPrice.BigInt(),
+	)
+
+	return types.QuoteExactOutResult{
+		SwapResult:     out.SwapResult,
+		InputAmount:    actualInputAmount,
+		MaxInputAmount: maxInputAmount,
+		PriceImpact:    priceImpact,
+	}, nil
+}
+
 // GetDepositQuote calculates the deposit quote for liquidity pool.
 func GetDepositQuote(param types.GetDepositQuoteParams) types.DepositQuote {
 
@@ -1926,7 +1999,7 @@ func (cp *CpAMM) RemoveALLLiquidity(
 	return ixns, nil
 }
 
-// Swap Bbuilds instruction to perform a swap in the pool.
+// Swap builds instruction to perform a swap in the pool.
 func (cp *CpAMM) Swap(
 	ctx context.Context,
 	param types.SwapParams,

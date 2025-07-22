@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"dammv2GoSDK/constants"
+	cp_amm "dammv2GoSDK/generated/cpAmm"
 	"dammv2GoSDK/maths"
 	"dammv2GoSDK/types"
 	"errors"
@@ -50,7 +51,7 @@ func GetFeeNumerator(
 		return cliffFeeNumerator
 	}
 
-	hold := new(big.Int).Div(
+	hold := new(big.Int).Quo(
 		new(big.Int).Sub(new(big.Int).SetUint64(currentPoint), activationPoint),
 		periodFrequency,
 	)
@@ -104,7 +105,7 @@ func GetBaseFeeNumerator(
 		)
 	}
 
-	bps := new(big.Int).Div(
+	bps := new(big.Int).Quo(
 		new(big.Int).Lsh(reductionFactor, constants.ScaleOffset),
 		big.NewInt(constants.BasisPointMax),
 	)
@@ -140,7 +141,7 @@ func GetDynamicFeeNumerator(
 
 	vFee := new(big.Int).Mul(variableFeeControl, squareVfaBin)
 
-	return new(big.Int).Div(
+	return new(big.Int).Quo(
 		new(big.Int).Add(vFee, big.NewInt(99_999_999_999)),
 		big.NewInt(100_000_000_000),
 	)
@@ -154,7 +155,6 @@ func GetDynamicFeeNumerator(
 func GetFeeMode(collectFeeMode types.CollectFeeMode, bToA bool) types.FeeMode {
 	feeOnInput := bToA && collectFeeMode == types.OnlyB
 	feesOnTokenA := bToA && collectFeeMode == types.BothToken
-
 	return types.FeeMode{
 		FeeOnInput:   feeOnInput,
 		FeesOnTokenA: feesOnTokenA,
@@ -272,14 +272,14 @@ func GetBaseFeeParams(
 	maxBaseFeeNumerator, minBaseFeeNumerator, periodFrequency :=
 		BpsToFeeNumerator(maxBaseFeeBps),
 		BpsToFeeNumerator(minBaseFeeBps),
-		new(big.Int).Div( // TODO: big.Int not needed if these numbers would be small (not overflow)
+		new(big.Int).Quo( // TODO: big.Int not needed if these numbers would be small (not overflow)
 			new(big.Int).SetUint64(totalDuration),
 			new(big.Int).SetUint64(numberOfPeriod),
 		)
 
 	var reductionFactor *big.Int
 	if feeSchedulerMode == types.Linear {
-		reductionFactor = new(big.Int).Div(
+		reductionFactor = new(big.Int).Quo(
 			new(big.Int).Sub(maxBaseFeeNumerator, minBaseFeeNumerator),
 			new(big.Int).SetUint64(numberOfPeriod),
 		)
@@ -305,14 +305,14 @@ func GetBaseFeeParams(
 //
 // bps - The value in basis points [1-10_000]
 func BpsToFeeNumerator(bps uint64) *big.Int {
-	return new(big.Int).Div(
+	return new(big.Int).Quo(
 		new(big.Int).SetUint64(bps*constants.FeeDenominator),
 		big.NewInt(constants.BasisPointMax),
 	)
 }
 
 func FeeNumeratorToBps(feeNumerator *big.Int) uint64 {
-	return new(big.Int).Div(
+	return new(big.Int).Quo(
 		new(big.Int).Mul(feeNumerator, big.NewInt(constants.BasisPointMax)),
 		big.NewInt(constants.FeeDenominator),
 	).Uint64()
@@ -349,7 +349,7 @@ func GetDynamicFeeParams(
 
 	sqrtPriceRatioFloored, _ := sqrtPriceRatio.Int(nil)
 	deltaBinId := new(big.Int).Mul(
-		new(big.Int).Div(
+		new(big.Int).Quo(
 			new(big.Int).Sub(sqrtPriceRatioFloored, maths.One),
 			constants.BinStepBpsU128Default,
 		),
@@ -363,7 +363,7 @@ func GetDynamicFeeParams(
 
 	baseFeeNumerator := BpsToFeeNumerator(baseFeeBps)
 
-	maxDynamicFeeNumerator := new(big.Int).Div(
+	maxDynamicFeeNumerator := new(big.Int).Quo(
 		new(big.Int).Mul(baseFeeNumerator, big.NewInt(20)), // default max dynamic fee = 20% of base fee.
 		big.NewInt(100),
 	)
@@ -373,7 +373,7 @@ func GetDynamicFeeParams(
 		big.NewInt(99_999_999_999),
 	)
 
-	variableFeeControl := new(big.Int).Div(vFee, squareVfaBin)
+	variableFeeControl := new(big.Int).Quo(vFee, squareVfaBin)
 
 	if !maxVolatilityAccumulator.IsInt64() {
 		return types.DynamicFee{}, errors.New("maxVolatilityAccumulator could not fit into uint64")
@@ -391,5 +391,271 @@ func GetDynamicFeeParams(
 		ReductionFactor:          constants.DynamicFeeReductionFactor,
 		MaxVolatilityAccumulator: maxVolatilityAccumulator.Uint64(),
 		VariableFeeControl:       variableFeeControl.Uint64(),
+	}, nil
+}
+
+// GetExcludedFeeAmount calculates the excluded fee amount and trading fee from an included fee amount.
+func GetExcludedFeeAmount(
+	tradeFeeNumerator, includedFeeAmount *big.Int,
+) struct{ ExcludedFeeAmount, TradingFee *big.Int } {
+	tradingFee := maths.MulDiv(
+		includedFeeAmount,
+		tradeFeeNumerator,
+		big.NewInt(constants.FeeDenominator),
+		types.RoundingUp,
+	)
+
+	excludededFeeAmount := new(big.Int).Sub(
+		includedFeeAmount,
+		tradingFee,
+	)
+	return struct {
+		ExcludedFeeAmount *big.Int
+		TradingFee        *big.Int
+	}{
+		ExcludedFeeAmount: excludededFeeAmount,
+		TradingFee:        tradingFee,
+	}
+}
+
+// GetIncludedFeeAmount calculates the included fee amount from an excluded fee amount.
+func GetIncludedFeeAmount(
+	tradeFeeNumerator, excludedFeeAmount *big.Int,
+) (*big.Int, error) {
+	denominator := new(big.Int).Sub(
+		big.NewInt(constants.FeeDenominator),
+		tradeFeeNumerator,
+	)
+	if denominator.Sign() <= 0 {
+		return nil, errors.New("invalid fee numerator")
+	}
+
+	includedFeeAmount := maths.MulDiv(
+		excludedFeeAmount,
+		tradeFeeNumerator,
+		big.NewInt(constants.FeeDenominator),
+		types.RoundingUp,
+	)
+
+	// Sanity check
+	out := GetExcludedFeeAmount(tradeFeeNumerator, includedFeeAmount)
+	if out.ExcludedFeeAmount.Cmp(excludedFeeAmount) < 0 {
+		return nil, errors.New("inverse amount is less than excluded_fee_amount")
+	}
+
+	return includedFeeAmount, nil
+}
+
+// GetInAmountFromAToB calculates the input amount required from A to B for a given output amount.
+func GetInAmountFromAToB(
+	pool *cp_amm.PoolAccount, outAmount *big.Int,
+) (types.SwapAmount, error) {
+	nextSqrtPrice, err := GetNextSqrtPriceFromOutput(
+		pool.SqrtPrice.BigInt(), pool.Liquidity.BigInt(), outAmount, true,
+	)
+	if err != nil {
+		return types.SwapAmount{}, err
+	}
+
+	if nextSqrtPrice.Cmp(pool.SqrtMinPrice.BigInt()) < 0 {
+		return types.SwapAmount{}, errors.New("price range is violated")
+	}
+
+	return types.SwapAmount{
+		NextSqrtPrice: nextSqrtPrice,
+		OutputAmount: GetAmountAFromLiquidityDelta(
+			pool.Liquidity.BigInt(),
+			nextSqrtPrice,
+			pool.SqrtPrice.BigInt(),
+			types.RoundingUp,
+		),
+	}, nil
+}
+
+// GetInAmountFromBToA calculates the input amount required from B to A for a given output amount.
+func GetInAmountFromBToA(
+	pool *cp_amm.PoolAccount, outAmount *big.Int,
+) (types.SwapAmount, error) {
+	// finding new target price
+	nextSqrtPrice, err := GetNextSqrtPriceFromOutput(
+		pool.SqrtPrice.BigInt(),
+		pool.Liquidity.BigInt(),
+		outAmount,
+		false,
+	)
+	if err != nil {
+		return types.SwapAmount{}, err
+	}
+
+	if nextSqrtPrice.Cmp(pool.SqrtMaxPrice.BigInt()) > 0 {
+		return types.SwapAmount{}, errors.New("price range is violated")
+	}
+	return types.SwapAmount{
+		NextSqrtPrice: nextSqrtPrice,
+		OutputAmount: GetAmountBFromLiquidityDelta(
+			pool.Liquidity.BigInt(),
+			pool.SqrtPrice.BigInt(),
+			nextSqrtPrice,
+			types.RoundingUp,
+		),
+	}, nil
+}
+
+// GetSwapResultFromOutAmount calculates the swap result from a given output amount.
+func GetSwapResultFromOutAmount(
+	pool *cp_amm.PoolAccount,
+	outAmount *big.Int, feeMode types.FeeMode,
+	tradeDirection types.TradeDirection,
+	currentPoint uint64,
+) (struct {
+	SwapResult  types.SwapResult
+	InputAmount *big.Int
+}, error) {
+
+	dynamicFeeParam := types.DynamicFeeParams{}
+	if h := pool.PoolFees.DynamicFee; h.Initialized == 1 {
+		dynamicFeeParam = types.DynamicFeeParams{
+			VolatilityAccumulator: h.VolatilityAccumulator.BigInt(),
+			BinStep:               h.BinStep,
+			VariableFeeControl:    h.VariableFeeControl,
+		}
+	}
+	tradeFeeNumerator := GetFeeNumerator(
+		currentPoint,
+		new(big.Int).SetUint64(pool.ActivationPoint),
+		pool.PoolFees.BaseFee.NumberOfPeriod,
+		new(big.Int).SetUint64(pool.PoolFees.BaseFee.PeriodFrequency),
+		types.FeeSchedulerMode(pool.PoolFees.BaseFee.FeeSchedulerMode),
+		new(big.Int).SetUint64(pool.PoolFees.BaseFee.CliffFeeNumerator),
+		new(big.Int).SetUint64(pool.PoolFees.BaseFee.ReductionFactor),
+		dynamicFeeParam,
+	)
+	var (
+		actualReferralFee    = big.NewInt(0)
+		actualProtocolFee    = big.NewInt(0)
+		actualPartnerFee     = big.NewInt(0)
+		actualLpFee          = big.NewInt(0)
+		includedFeeOutAmount = outAmount
+		err                  error
+	)
+	if !feeMode.FeeOnInput {
+		if includedFeeOutAmount, err = GetIncludedFeeAmount(
+			tradeFeeNumerator, outAmount); err != nil {
+			return struct {
+				SwapResult  types.SwapResult
+				InputAmount *big.Int
+			}{}, err
+		}
+
+		totalFee := GetTotalFeeOnAmount(outAmount, tradeFeeNumerator)
+		actualProtocolFee = maths.MulDiv(
+			totalFee,
+			new(big.Int).SetUint64(uint64(pool.PoolFees.ProtocolFeePercent)),
+			big.NewInt(100),
+			types.RoundingDown,
+		)
+
+		if feeMode.HasReferral {
+			actualReferralFee = maths.MulDiv(
+				actualProtocolFee,
+				new(big.Int).SetUint64(uint64(pool.PoolFees.ReferralFeePercent)),
+				big.NewInt(100),
+				types.RoundingDown,
+			)
+		}
+
+		protocolFeeAfterReferral := new(big.Int).Sub(
+			actualProtocolFee,
+			actualReferralFee,
+		)
+
+		actualPartnerFee = maths.MulDiv(
+			protocolFeeAfterReferral,
+			new(big.Int).SetUint64(uint64(pool.PoolFees.PartnerFeePercent)),
+			big.NewInt(100),
+			types.RoundingDown,
+		)
+
+		actualLpFee = new(big.Int).Sub(
+			actualProtocolFee,
+			actualPartnerFee,
+		)
+	}
+
+	var tDirection types.SwapAmount
+	if tradeDirection == types.AtoB {
+		if tDirection, err = GetInAmountFromAToB(pool, includedFeeOutAmount); err != nil {
+			return struct {
+				SwapResult  types.SwapResult
+				InputAmount *big.Int
+			}{}, err
+		}
+	} else {
+		if tDirection, err = GetInAmountFromBToA(pool, includedFeeOutAmount); err != nil {
+			return struct {
+				SwapResult  types.SwapResult
+				InputAmount *big.Int
+			}{}, err
+		}
+	}
+
+	includedFeeInAmount := tDirection.OutputAmount
+	if feeMode.FeeOnInput {
+		if includedFeeInAmount, err = GetIncludedFeeAmount(
+			tradeFeeNumerator, tDirection.OutputAmount); err != nil {
+			return struct {
+				SwapResult  types.SwapResult
+				InputAmount *big.Int
+			}{}, err
+		}
+
+		totalFee := GetTotalFeeOnAmount(includedFeeInAmount, tradeFeeNumerator)
+		actualProtocolFee = maths.MulDiv(
+			totalFee,
+			new(big.Int).SetUint64(uint64(pool.PoolFees.ProtocolFeePercent)),
+			big.NewInt(100),
+			types.RoundingDown,
+		)
+
+		if feeMode.HasReferral {
+			actualReferralFee = maths.MulDiv(
+				actualProtocolFee,
+				new(big.Int).SetUint64(uint64(pool.PoolFees.ReferralFeePercent)),
+				big.NewInt(100),
+				types.RoundingDown,
+			)
+		}
+
+		protocolFeeAfterReferral := new(big.Int).Sub(
+			actualProtocolFee,
+			actualReferralFee,
+		)
+
+		actualPartnerFee = maths.MulDiv(
+			protocolFeeAfterReferral,
+			new(big.Int).SetUint64(uint64(pool.PoolFees.PartnerFeePercent)),
+			big.NewInt(100),
+			types.RoundingDown,
+		)
+
+		actualLpFee = new(big.Int).Sub(
+			actualProtocolFee,
+			actualPartnerFee,
+		)
+	}
+
+	return struct {
+		SwapResult  types.SwapResult
+		InputAmount *big.Int
+	}{
+		SwapResult: types.SwapResult{
+			OutputAmount:  outAmount,
+			NextSqrtPrice: tDirection.NextSqrtPrice,
+			LPFee:         actualLpFee,
+			ProtocolFee:   actualProtocolFee,
+			ReferralFee:   actualReferralFee,
+			PartnerFee:    actualPartnerFee,
+		},
+		InputAmount: includedFeeInAmount,
 	}, nil
 }
