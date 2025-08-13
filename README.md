@@ -6,7 +6,7 @@ The work done so far aims to maintain correctness & closeness w/ the JS/TS SDK. 
 
 Since there’s no Bankrun or LiteSVM for Go, the next best option (if not better) is — [Surfpool, specifically Surfnet](https://docs.surfpool.run/rpc/surfnet). It runs a local Solana validator but with real on-chain data. The program binary can be [found here](https://github.com/txtx/surfpool/releases).
 
-At the time of writing this README.md, I’m still using `v0.9.1`. Versions up to `v0.9.5` were crashing (I’ve been in touch with the devs on Discord about this 🤣). The current version is `v0.10.2`, which I’ll be testing soon and will update this README if all goes well.
+At the time of writing this README.md, I’m still using `v0.9.1`. Versions up to `v0.9.5` were crashing (I’ve been in touch with the devs on Discord about this 🤣). The current version is `v0.10.2`, which I’ll be testing soon and will update this README if all goes well. There’s a [fork of the JS SDK](https://github.com/tobyweb3x/damm-v2-sdk/tree/tobytobias.sol/tests/surfpool) where I modified the test to use **Surfpool** instead of **Bankrun** — no other changes were made, except that the `bankClient` parameter was replaced with `Connection`.
 
 - to run all test:
 
