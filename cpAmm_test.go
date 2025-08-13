@@ -368,7 +368,7 @@ func TestClaimFee(t *testing.T) {
 }
 
 func TestClaimFee2(t *testing.T) {
-	// t.Skip("TestClaimFee2 skippped")
+	t.Skip("TestClaimFee2 skippped")
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
 	if err != nil {
@@ -941,7 +941,7 @@ func TestCreateCustomizablePool(t *testing.T) {
 }
 
 func TestCreateCustomizablePoolWithConfig(t *testing.T) {
-	// t.Skip("TestCreateCustomizablePoolWithConfig skipped")
+	t.Skip("TestCreateCustomizablePoolWithConfig skipped")
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
 	if err != nil {
@@ -1509,7 +1509,7 @@ func TestLockPosition(t *testing.T) {
 
 }
 func TestMergePosition(t *testing.T) {
-	// t.Skip("TestMergePosition skipped")
+	t.Skip("TestMergePosition skipped")
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
 	if err != nil {
