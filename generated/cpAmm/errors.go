@@ -226,6 +226,31 @@ var (
 		msg:  "Invalid config type",
 		name: "InvalidConfigType",
 	}
+	ErrInvalidPoolCreator = &customErrorDef{
+		code: 6042,
+		msg:  "Invalid pool creator",
+		name: "InvalidPoolCreator",
+	}
+	ErrRewardVaultFrozenSkipRequired = &customErrorDef{
+		code: 6043,
+		msg:  "Reward vault is frozen, must skip reward to proceed",
+		name: "RewardVaultFrozenSkipRequired",
+	}
+	ErrInvalidSplitPositionParameters = &customErrorDef{
+		code: 6044,
+		msg:  "Invalid parameters for split position",
+		name: "InvalidSplitPositionParameters",
+	}
+	ErrUnsupportPositionHasVestingLock = &customErrorDef{
+		code: 6045,
+		msg:  "Unsupported split position has vesting lock",
+		name: "UnsupportPositionHasVestingLock",
+	}
+	ErrSamePosition = &customErrorDef{
+		code: 6046,
+		msg:  "Same position",
+		name: "SamePosition",
+	}
 	Errors = map[int]CustomError{
 		6000: ErrMathOverflow,
 		6001: ErrInvalidFee,
@@ -269,6 +294,11 @@ var (
 		6039: ErrPositionIsNotEmpty,
 		6040: ErrInvalidPoolCreatorAuthority,
 		6041: ErrInvalidConfigType,
+		6042: ErrInvalidPoolCreator,
+		6043: ErrRewardVaultFrozenSkipRequired,
+		6044: ErrInvalidSplitPositionParameters,
+		6045: ErrUnsupportPositionHasVestingLock,
+		6046: ErrSamePosition,
 	}
 )
 

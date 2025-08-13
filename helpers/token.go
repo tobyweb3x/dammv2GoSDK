@@ -99,7 +99,7 @@ func UnwrapSOLInstruction(
 		receiver,
 		owner,
 		nil,
-	).Build(), nil
+	).ValidateAndBuild()
 
 }
 

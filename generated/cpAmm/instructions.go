@@ -44,6 +44,8 @@ var (
 
 	Instruction_ClosePosition = ag_binary.TypeID([8]byte{123, 134, 81, 0, 49, 68, 98, 98})
 
+	Instruction_CloseTokenBadge = ag_binary.TypeID([8]byte{108, 146, 86, 110, 179, 254, 10, 104})
+
 	Instruction_CreateClaimFeeOperator = ag_binary.TypeID([8]byte{169, 62, 207, 107, 58, 187, 162, 109})
 
 	// ADMIN FUNCTIONS /////
@@ -78,6 +80,8 @@ var (
 
 	Instruction_SetPoolStatus = ag_binary.TypeID([8]byte{112, 87, 135, 223, 83, 204, 132, 53})
 
+	Instruction_SplitPosition = ag_binary.TypeID([8]byte{172, 241, 221, 138, 161, 29, 253, 42})
+
 	Instruction_Swap = ag_binary.TypeID([8]byte{248, 198, 158, 145, 225, 117, 135, 200})
 
 	Instruction_UpdateRewardDuration = ag_binary.TypeID([8]byte{138, 174, 196, 169, 213, 235, 254, 107})
@@ -106,6 +110,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "CloseConfig"
 	case Instruction_ClosePosition:
 		return "ClosePosition"
+	case Instruction_CloseTokenBadge:
+		return "CloseTokenBadge"
 	case Instruction_CreateClaimFeeOperator:
 		return "CreateClaimFeeOperator"
 	case Instruction_CreateConfig:
@@ -138,6 +144,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "RemoveLiquidity"
 	case Instruction_SetPoolStatus:
 		return "SetPoolStatus"
+	case Instruction_SplitPosition:
+		return "SplitPosition"
 	case Instruction_Swap:
 		return "Swap"
 	case Instruction_UpdateRewardDuration:
@@ -191,6 +199,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 			Name: "close_position", Type: (*ClosePositionInstruction)(nil),
 		},
 		{
+			Name: "close_token_badge", Type: (*CloseTokenBadgeInstruction)(nil),
+		},
+		{
 			Name: "create_claim_fee_operator", Type: (*CreateClaimFeeOperatorInstruction)(nil),
 		},
 		{
@@ -237,6 +248,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			Name: "set_pool_status", Type: (*SetPoolStatusInstruction)(nil),
+		},
+		{
+			Name: "split_position", Type: (*SplitPositionInstruction)(nil),
 		},
 		{
 			Name: "swap", Type: (*SwapInstruction)(nil),

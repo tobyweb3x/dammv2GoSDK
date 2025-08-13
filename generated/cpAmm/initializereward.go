@@ -24,24 +24,27 @@ type InitializeRewardInstruction struct {
 	//
 	// [3] = [] reward_mint
 	//
-	// [4] = [WRITE, SIGNER] admin
+	// [4] = [SIGNER] signer
 	//
-	// [5] = [] token_program
+	// [5] = [WRITE, SIGNER] payer
 	//
-	// [6] = [] system_program
+	// [6] = [] token_program
 	//
-	// [7] = [] event_authority
+	// [7] = [] system_program
 	//
-	// [8] = [] program
+	// [8] = [] event_authority
+	//
+	// [9] = [] program
 	ag_solanago.AccountMetaSlice `bin:"-"`
 }
 
 // NewInitializeRewardInstructionBuilder creates a new `InitializeRewardInstruction` instruction builder.
 func NewInitializeRewardInstructionBuilder() *InitializeRewardInstruction {
 	nd := &InitializeRewardInstruction{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 9),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 10),
 	}
-	nd.AccountMetaSlice[6] = ag_solanago.Meta(Addresses["11111111111111111111111111111111"])
+	nd.AccountMetaSlice[0] = ag_solanago.Meta(Addresses["HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"])
+	nd.AccountMetaSlice[7] = ag_solanago.Meta(Addresses["11111111111111111111111111111111"])
 	return nd
 }
 
@@ -67,48 +70,6 @@ func (inst *InitializeRewardInstruction) SetFunder(funder ag_solanago.PublicKey)
 func (inst *InitializeRewardInstruction) SetPoolAuthorityAccount(poolAuthority ag_solanago.PublicKey) *InitializeRewardInstruction {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(poolAuthority)
 	return inst
-}
-
-func (inst *InitializeRewardInstruction) findFindPoolAuthorityAddress(knownBumpSeed uint8) (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	var seeds [][]byte
-	// const: pool_authority
-	seeds = append(seeds, []byte{byte(0x70), byte(0x6f), byte(0x6f), byte(0x6c), byte(0x5f), byte(0x61), byte(0x75), byte(0x74), byte(0x68), byte(0x6f), byte(0x72), byte(0x69), byte(0x74), byte(0x79)})
-
-	if knownBumpSeed != 0 {
-		seeds = append(seeds, []byte{byte(bumpSeed)})
-		pda, err = ag_solanago.CreateProgramAddress(seeds, ProgramID)
-	} else {
-		pda, bumpSeed, err = ag_solanago.FindProgramAddress(seeds, ProgramID)
-	}
-	return
-}
-
-// FindPoolAuthorityAddressWithBumpSeed calculates PoolAuthority account address with given seeds and a known bump seed.
-func (inst *InitializeRewardInstruction) FindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey, err error) {
-	pda, _, err = inst.findFindPoolAuthorityAddress(bumpSeed)
-	return
-}
-
-func (inst *InitializeRewardInstruction) MustFindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(bumpSeed)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
-// FindPoolAuthorityAddress finds PoolAuthority account address with given seeds.
-func (inst *InitializeRewardInstruction) FindPoolAuthorityAddress() (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	pda, bumpSeed, err = inst.findFindPoolAuthorityAddress(0)
-	return
-}
-
-func (inst *InitializeRewardInstruction) MustFindPoolAuthorityAddress() (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(0)
-	if err != nil {
-		panic(err)
-	}
-	return
 }
 
 // GetPoolAuthorityAccount gets the "pool_authority" account.
@@ -199,42 +160,53 @@ func (inst *InitializeRewardInstruction) GetRewardMintAccount() *ag_solanago.Acc
 	return inst.AccountMetaSlice.Get(3)
 }
 
-// SetAdminAccount sets the "admin" account.
-func (inst *InitializeRewardInstruction) SetAdminAccount(admin ag_solanago.PublicKey) *InitializeRewardInstruction {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(admin).WRITE().SIGNER()
+// SetSignerAccount sets the "signer" account.
+func (inst *InitializeRewardInstruction) SetSignerAccount(signer ag_solanago.PublicKey) *InitializeRewardInstruction {
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(signer).SIGNER()
 	return inst
 }
 
-// GetAdminAccount gets the "admin" account.
-func (inst *InitializeRewardInstruction) GetAdminAccount() *ag_solanago.AccountMeta {
+// GetSignerAccount gets the "signer" account.
+func (inst *InitializeRewardInstruction) GetSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(4)
+}
+
+// SetPayerAccount sets the "payer" account.
+func (inst *InitializeRewardInstruction) SetPayerAccount(payer ag_solanago.PublicKey) *InitializeRewardInstruction {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(payer).WRITE().SIGNER()
+	return inst
+}
+
+// GetPayerAccount gets the "payer" account.
+func (inst *InitializeRewardInstruction) GetPayerAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice.Get(5)
 }
 
 // SetTokenProgramAccount sets the "token_program" account.
 func (inst *InitializeRewardInstruction) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *InitializeRewardInstruction {
-	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenProgram)
+	inst.AccountMetaSlice[6] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
 // GetTokenProgramAccount gets the "token_program" account.
 func (inst *InitializeRewardInstruction) GetTokenProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(5)
+	return inst.AccountMetaSlice.Get(6)
 }
 
 // SetSystemProgramAccount sets the "system_program" account.
 func (inst *InitializeRewardInstruction) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeRewardInstruction {
-	inst.AccountMetaSlice[6] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[7] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "system_program" account.
 func (inst *InitializeRewardInstruction) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(6)
+	return inst.AccountMetaSlice.Get(7)
 }
 
 // SetEventAuthorityAccount sets the "event_authority" account.
 func (inst *InitializeRewardInstruction) SetEventAuthorityAccount(eventAuthority ag_solanago.PublicKey) *InitializeRewardInstruction {
-	inst.AccountMetaSlice[7] = ag_solanago.Meta(eventAuthority)
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(eventAuthority)
 	return inst
 }
 
@@ -282,18 +254,18 @@ func (inst *InitializeRewardInstruction) MustFindEventAuthorityAddress() (pda ag
 
 // GetEventAuthorityAccount gets the "event_authority" account.
 func (inst *InitializeRewardInstruction) GetEventAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(7)
+	return inst.AccountMetaSlice.Get(8)
 }
 
 // SetProgramAccount sets the "program" account.
 func (inst *InitializeRewardInstruction) SetProgramAccount(program ag_solanago.PublicKey) *InitializeRewardInstruction {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(program)
+	inst.AccountMetaSlice[9] = ag_solanago.Meta(program)
 	return inst
 }
 
 // GetProgramAccount gets the "program" account.
 func (inst *InitializeRewardInstruction) GetProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice.Get(8)
+	return inst.AccountMetaSlice.Get(9)
 }
 
 func (inst InitializeRewardInstruction) Build() *Instruction {
@@ -342,18 +314,21 @@ func (inst *InitializeRewardInstruction) Validate() error {
 			return errors.New("accounts.RewardMint is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
-			return errors.New("accounts.Admin is not set")
+			return errors.New("accounts.Signer is not set")
 		}
 		if inst.AccountMetaSlice[5] == nil {
-			return errors.New("accounts.TokenProgram is not set")
+			return errors.New("accounts.Payer is not set")
 		}
 		if inst.AccountMetaSlice[6] == nil {
-			return errors.New("accounts.SystemProgram is not set")
+			return errors.New("accounts.TokenProgram is not set")
 		}
 		if inst.AccountMetaSlice[7] == nil {
-			return errors.New("accounts.EventAuthority is not set")
+			return errors.New("accounts.SystemProgram is not set")
 		}
 		if inst.AccountMetaSlice[8] == nil {
+			return errors.New("accounts.EventAuthority is not set")
+		}
+		if inst.AccountMetaSlice[9] == nil {
 			return errors.New("accounts.Program is not set")
 		}
 	}
@@ -376,16 +351,17 @@ func (inst *InitializeRewardInstruction) EncodeToTree(parent ag_treeout.Branches
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=9]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=10]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta(" pool_authority", inst.AccountMetaSlice.Get(0)))
 						accountsBranch.Child(ag_format.Meta("           pool", inst.AccountMetaSlice.Get(1)))
 						accountsBranch.Child(ag_format.Meta("   reward_vault", inst.AccountMetaSlice.Get(2)))
 						accountsBranch.Child(ag_format.Meta("    reward_mint", inst.AccountMetaSlice.Get(3)))
-						accountsBranch.Child(ag_format.Meta("          admin", inst.AccountMetaSlice.Get(4)))
-						accountsBranch.Child(ag_format.Meta("  token_program", inst.AccountMetaSlice.Get(5)))
-						accountsBranch.Child(ag_format.Meta(" system_program", inst.AccountMetaSlice.Get(6)))
-						accountsBranch.Child(ag_format.Meta("event_authority", inst.AccountMetaSlice.Get(7)))
-						accountsBranch.Child(ag_format.Meta("        program", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("         signer", inst.AccountMetaSlice.Get(4)))
+						accountsBranch.Child(ag_format.Meta("          payer", inst.AccountMetaSlice.Get(5)))
+						accountsBranch.Child(ag_format.Meta("  token_program", inst.AccountMetaSlice.Get(6)))
+						accountsBranch.Child(ag_format.Meta(" system_program", inst.AccountMetaSlice.Get(7)))
+						accountsBranch.Child(ag_format.Meta("event_authority", inst.AccountMetaSlice.Get(8)))
+						accountsBranch.Child(ag_format.Meta("        program", inst.AccountMetaSlice.Get(9)))
 					})
 				})
 		})
@@ -439,7 +415,8 @@ func NewInitializeRewardInstruction(
 	pool ag_solanago.PublicKey,
 	rewardVault ag_solanago.PublicKey,
 	rewardMint ag_solanago.PublicKey,
-	admin ag_solanago.PublicKey,
+	signer ag_solanago.PublicKey,
+	payer ag_solanago.PublicKey,
 	tokenProgram ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
 	eventAuthority ag_solanago.PublicKey,
@@ -452,7 +429,8 @@ func NewInitializeRewardInstruction(
 		SetPoolAccount(pool).
 		SetRewardVaultAccount(rewardVault).
 		SetRewardMintAccount(rewardMint).
-		SetAdminAccount(admin).
+		SetSignerAccount(signer).
+		SetPayerAccount(payer).
 		SetTokenProgramAccount(tokenProgram).
 		SetSystemProgramAccount(systemProgram).
 		SetEventAuthorityAccount(eventAuthority).

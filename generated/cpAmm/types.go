@@ -1576,6 +1576,9 @@ type EvtFundReward struct {
 	RewardIndex                 uint8
 	Amount                      uint64
 	TransferFeeExcludedAmountIn uint64
+	RewardDurationEnd           uint64
+	PreRewardRate               ag_binary.Uint128
+	PostRewardRate              ag_binary.Uint128
 }
 
 func (obj EvtFundReward) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -1606,6 +1609,21 @@ func (obj EvtFundReward) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `TransferFeeExcludedAmountIn` param:
 	err = encoder.Encode(obj.TransferFeeExcludedAmountIn)
+	if err != nil {
+		return err
+	}
+	// Serialize `RewardDurationEnd` param:
+	err = encoder.Encode(obj.RewardDurationEnd)
+	if err != nil {
+		return err
+	}
+	// Serialize `PreRewardRate` param:
+	err = encoder.Encode(obj.PreRewardRate)
+	if err != nil {
+		return err
+	}
+	// Serialize `PostRewardRate` param:
+	err = encoder.Encode(obj.PostRewardRate)
 	if err != nil {
 		return err
 	}
@@ -1640,6 +1658,21 @@ func (obj *EvtFundReward) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	}
 	// Deserialize `TransferFeeExcludedAmountIn`:
 	err = decoder.Decode(&obj.TransferFeeExcludedAmountIn)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RewardDurationEnd`:
+	err = decoder.Decode(&obj.RewardDurationEnd)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PreRewardRate`:
+	err = decoder.Decode(&obj.PreRewardRate)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PostRewardRate`:
+	err = decoder.Decode(&obj.PostRewardRate)
 	if err != nil {
 		return err
 	}
@@ -1892,6 +1925,7 @@ type EvtInitializeReward struct {
 	Pool           ag_solanago.PublicKey
 	RewardMint     ag_solanago.PublicKey
 	Funder         ag_solanago.PublicKey
+	Creator        ag_solanago.PublicKey
 	RewardIndex    uint8
 	RewardDuration uint64
 }
@@ -1909,6 +1943,11 @@ func (obj EvtInitializeReward) MarshalWithEncoder(encoder *ag_binary.Encoder) (e
 	}
 	// Serialize `Funder` param:
 	err = encoder.Encode(obj.Funder)
+	if err != nil {
+		return err
+	}
+	// Serialize `Creator` param:
+	err = encoder.Encode(obj.Creator)
 	if err != nil {
 		return err
 	}
@@ -1938,6 +1977,11 @@ func (obj *EvtInitializeReward) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 	}
 	// Deserialize `Funder`:
 	err = decoder.Decode(&obj.Funder)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Creator`:
+	err = decoder.Decode(&obj.Creator)
 	if err != nil {
 		return err
 	}
@@ -2223,6 +2267,127 @@ func (obj *EvtSetPoolStatus) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 	}
 	// Deserialize `Status`:
 	err = decoder.Decode(&obj.Status)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type EvtSplitPosition struct {
+	Pool                    ag_solanago.PublicKey
+	FirstOwner              ag_solanago.PublicKey
+	SecondOwner             ag_solanago.PublicKey
+	FirstPosition           ag_solanago.PublicKey
+	SecondPosition          ag_solanago.PublicKey
+	CurrentSqrtPrice        ag_binary.Uint128
+	AmountSplits            SplitAmountInfo
+	FirstPositionInfo       SplitPositionInfo
+	SecondPositionInfo      SplitPositionInfo
+	SplitPositionParameters SplitPositionParameters
+}
+
+func (obj EvtSplitPosition) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Pool` param:
+	err = encoder.Encode(obj.Pool)
+	if err != nil {
+		return err
+	}
+	// Serialize `FirstOwner` param:
+	err = encoder.Encode(obj.FirstOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `SecondOwner` param:
+	err = encoder.Encode(obj.SecondOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `FirstPosition` param:
+	err = encoder.Encode(obj.FirstPosition)
+	if err != nil {
+		return err
+	}
+	// Serialize `SecondPosition` param:
+	err = encoder.Encode(obj.SecondPosition)
+	if err != nil {
+		return err
+	}
+	// Serialize `CurrentSqrtPrice` param:
+	err = encoder.Encode(obj.CurrentSqrtPrice)
+	if err != nil {
+		return err
+	}
+	// Serialize `AmountSplits` param:
+	err = encoder.Encode(obj.AmountSplits)
+	if err != nil {
+		return err
+	}
+	// Serialize `FirstPositionInfo` param:
+	err = encoder.Encode(obj.FirstPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Serialize `SecondPositionInfo` param:
+	err = encoder.Encode(obj.SecondPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Serialize `SplitPositionParameters` param:
+	err = encoder.Encode(obj.SplitPositionParameters)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *EvtSplitPosition) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Pool`:
+	err = decoder.Decode(&obj.Pool)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FirstOwner`:
+	err = decoder.Decode(&obj.FirstOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SecondOwner`:
+	err = decoder.Decode(&obj.SecondOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FirstPosition`:
+	err = decoder.Decode(&obj.FirstPosition)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SecondPosition`:
+	err = decoder.Decode(&obj.SecondPosition)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CurrentSqrtPrice`:
+	err = decoder.Decode(&obj.CurrentSqrtPrice)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AmountSplits`:
+	err = decoder.Decode(&obj.AmountSplits)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FirstPositionInfo`:
+	err = decoder.Decode(&obj.FirstPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SecondPositionInfo`:
+	err = decoder.Decode(&obj.SecondPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SplitPositionParameters`:
+	err = decoder.Decode(&obj.SplitPositionParameters)
 	if err != nil {
 		return err
 	}
@@ -2772,8 +2937,11 @@ type Pool struct {
 	// metrics
 	Metrics PoolMetrics
 
+	// pool creator
+	Creator ag_solanago.PublicKey
+
 	// Padding for further use
-	Padding1 [10]uint64
+	Padding1 [6]uint64
 
 	// Farming reward information
 	RewardInfos [2]RewardInfo
@@ -2917,6 +3085,11 @@ func (obj Pool) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Metrics` param:
 	err = encoder.Encode(obj.Metrics)
+	if err != nil {
+		return err
+	}
+	// Serialize `Creator` param:
+	err = encoder.Encode(obj.Creator)
 	if err != nil {
 		return err
 	}
@@ -3074,6 +3247,11 @@ func (obj *Pool) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Deserialize `Creator`:
+	err = decoder.Decode(&obj.Creator)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Padding1`:
 	err = decoder.Decode(&obj.Padding1)
 	if err != nil {
@@ -3091,14 +3269,8 @@ type PoolFeeParameters struct {
 	// Base fee
 	BaseFee BaseFeeParameters
 
-	// Protocol trade fee percent
-	ProtocolFeePercent uint8
-
-	// partner fee percent
-	PartnerFeePercent uint8
-
-	// referral fee percent
-	ReferralFeePercent uint8
+	// padding
+	Padding [3]uint8
 
 	// dynamic fee
 	DynamicFee *DynamicFeeParameters `bin:"optional"`
@@ -3110,18 +3282,8 @@ func (obj PoolFeeParameters) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	if err != nil {
 		return err
 	}
-	// Serialize `ProtocolFeePercent` param:
-	err = encoder.Encode(obj.ProtocolFeePercent)
-	if err != nil {
-		return err
-	}
-	// Serialize `PartnerFeePercent` param:
-	err = encoder.Encode(obj.PartnerFeePercent)
-	if err != nil {
-		return err
-	}
-	// Serialize `ReferralFeePercent` param:
-	err = encoder.Encode(obj.ReferralFeePercent)
+	// Serialize `Padding` param:
+	err = encoder.Encode(obj.Padding)
 	if err != nil {
 		return err
 	}
@@ -3152,18 +3314,8 @@ func (obj *PoolFeeParameters) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	if err != nil {
 		return err
 	}
-	// Deserialize `ProtocolFeePercent`:
-	err = decoder.Decode(&obj.ProtocolFeePercent)
-	if err != nil {
-		return err
-	}
-	// Deserialize `PartnerFeePercent`:
-	err = decoder.Decode(&obj.PartnerFeePercent)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ReferralFeePercent`:
-	err = decoder.Decode(&obj.ReferralFeePercent)
+	// Deserialize `Padding`:
+	err = decoder.Decode(&obj.Padding)
 	if err != nil {
 		return err
 	}
@@ -3897,6 +4049,250 @@ func (obj *RewardInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `CumulativeSecondsWithEmptyLiquidityReward`:
 	err = decoder.Decode(&obj.CumulativeSecondsWithEmptyLiquidityReward)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SplitAmountInfo struct {
+	PermanentLockedLiquidity ag_binary.Uint128
+	UnlockedLiquidity        ag_binary.Uint128
+	FeeA                     uint64
+	FeeB                     uint64
+	Reward0                  uint64
+	Reward1                  uint64
+}
+
+func (obj SplitAmountInfo) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `PermanentLockedLiquidity` param:
+	err = encoder.Encode(obj.PermanentLockedLiquidity)
+	if err != nil {
+		return err
+	}
+	// Serialize `UnlockedLiquidity` param:
+	err = encoder.Encode(obj.UnlockedLiquidity)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeA` param:
+	err = encoder.Encode(obj.FeeA)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeB` param:
+	err = encoder.Encode(obj.FeeB)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reward0` param:
+	err = encoder.Encode(obj.Reward0)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reward1` param:
+	err = encoder.Encode(obj.Reward1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SplitAmountInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `PermanentLockedLiquidity`:
+	err = decoder.Decode(&obj.PermanentLockedLiquidity)
+	if err != nil {
+		return err
+	}
+	// Deserialize `UnlockedLiquidity`:
+	err = decoder.Decode(&obj.UnlockedLiquidity)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeA`:
+	err = decoder.Decode(&obj.FeeA)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeB`:
+	err = decoder.Decode(&obj.FeeB)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reward0`:
+	err = decoder.Decode(&obj.Reward0)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reward1`:
+	err = decoder.Decode(&obj.Reward1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SplitPositionInfo struct {
+	Liquidity ag_binary.Uint128
+	FeeA      uint64
+	FeeB      uint64
+	Reward0   uint64
+	Reward1   uint64
+}
+
+func (obj SplitPositionInfo) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Liquidity` param:
+	err = encoder.Encode(obj.Liquidity)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeA` param:
+	err = encoder.Encode(obj.FeeA)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeB` param:
+	err = encoder.Encode(obj.FeeB)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reward0` param:
+	err = encoder.Encode(obj.Reward0)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reward1` param:
+	err = encoder.Encode(obj.Reward1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SplitPositionInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Liquidity`:
+	err = decoder.Decode(&obj.Liquidity)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeA`:
+	err = decoder.Decode(&obj.FeeA)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeB`:
+	err = decoder.Decode(&obj.FeeB)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reward0`:
+	err = decoder.Decode(&obj.Reward0)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reward1`:
+	err = decoder.Decode(&obj.Reward1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SplitPositionParameters struct {
+	// Percentage of unlocked liquidity to split to the second position
+	UnlockedLiquidityPercentage uint8
+
+	// Percentage of permanent locked liquidity to split to the second position
+	PermanentLockedLiquidityPercentage uint8
+
+	// Percentage of fee A pending to split to the second position
+	FeeAPercentage uint8
+
+	// Percentage of fee B pending to split to the second position
+	FeeBPercentage uint8
+
+	// Percentage of reward 0 pending to split to the second position
+	Reward0Percentage uint8
+
+	// Percentage of reward 1 pending to split to the second position
+	Reward1Percentage uint8
+
+	// padding for future
+	Padding [16]uint8
+}
+
+func (obj SplitPositionParameters) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `UnlockedLiquidityPercentage` param:
+	err = encoder.Encode(obj.UnlockedLiquidityPercentage)
+	if err != nil {
+		return err
+	}
+	// Serialize `PermanentLockedLiquidityPercentage` param:
+	err = encoder.Encode(obj.PermanentLockedLiquidityPercentage)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeAPercentage` param:
+	err = encoder.Encode(obj.FeeAPercentage)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeBPercentage` param:
+	err = encoder.Encode(obj.FeeBPercentage)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reward0Percentage` param:
+	err = encoder.Encode(obj.Reward0Percentage)
+	if err != nil {
+		return err
+	}
+	// Serialize `Reward1Percentage` param:
+	err = encoder.Encode(obj.Reward1Percentage)
+	if err != nil {
+		return err
+	}
+	// Serialize `Padding` param:
+	err = encoder.Encode(obj.Padding)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SplitPositionParameters) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `UnlockedLiquidityPercentage`:
+	err = decoder.Decode(&obj.UnlockedLiquidityPercentage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PermanentLockedLiquidityPercentage`:
+	err = decoder.Decode(&obj.PermanentLockedLiquidityPercentage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeAPercentage`:
+	err = decoder.Decode(&obj.FeeAPercentage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeBPercentage`:
+	err = decoder.Decode(&obj.FeeBPercentage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reward0Percentage`:
+	err = decoder.Decode(&obj.Reward0Percentage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Reward1Percentage`:
+	err = decoder.Decode(&obj.Reward1Percentage)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Padding`:
+	err = decoder.Decode(&obj.Padding)
 	if err != nil {
 		return err
 	}

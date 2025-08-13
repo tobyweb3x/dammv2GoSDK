@@ -98,7 +98,7 @@ func GetBaseFeeNumerator(
 	reductionFactor *big.Int,
 ) *big.Int {
 
-	if feeSchedulerMode == types.Linear {
+	if feeSchedulerMode == types.FeeSchedulerModeLinear {
 		return new(big.Int).Sub(
 			cliffFeeNumerator,
 			new(big.Int).Mul(reductionFactor, period),
@@ -153,8 +153,8 @@ func GetDynamicFeeNumerator(
 //
 // btoA - Boolean indicating if the swap is from token B to token A.
 func GetFeeMode(collectFeeMode types.CollectFeeMode, bToA bool) types.FeeMode {
-	feeOnInput := bToA && collectFeeMode == types.OnlyB
-	feesOnTokenA := bToA && collectFeeMode == types.BothToken
+	feeOnInput := bToA && collectFeeMode == types.CollectFeeModeOnlyB
+	feesOnTokenA := bToA && collectFeeMode == types.CollectFeeModeBothToken
 	return types.FeeMode{
 		FeeOnInput:   feeOnInput,
 		FeesOnTokenA: feesOnTokenA,
@@ -242,61 +242,79 @@ func GetSwapAmount(
 func GetBaseFeeParams(
 	maxBaseFeeBps, minBaseFeeBps uint64,
 	feeSchedulerMode types.FeeSchedulerMode,
-	numberOfPeriod, totalDuration uint64,
-) (types.BaseFee, error) {
+	numberOfPeriod uint16, totalDuration uint64,
+) (cp_amm.BaseFeeParameters, error) {
 	if maxBaseFeeBps == minBaseFeeBps {
 		if numberOfPeriod != 0 || totalDuration != 0 {
-			return types.BaseFee{}, errors.New("numberOfPeriod and totalDuration must both be zero")
+			return cp_amm.BaseFeeParameters{}, errors.New("numberOfPeriod and totalDuration must both be zero")
 		}
 
-		return types.BaseFee{CliffFeeNumerator: BpsToFeeNumerator(maxBaseFeeBps)}, nil
+		cliffFeeNumerator := BpsToFeeNumerator(maxBaseFeeBps)
+		if !cliffFeeNumerator.IsUint64() {
+			return cp_amm.BaseFeeParameters{}, fmt.Errorf("cannot fit cliffFeeNumerator(%s) into uint64", cliffFeeNumerator)
+		}
+		return cp_amm.BaseFeeParameters{CliffFeeNumerator: cliffFeeNumerator.Uint64()}, nil
 	}
 
 	if numberOfPeriod <= 0 {
-		return types.BaseFee{}, errors.New("total periods must be greater than zero")
+		return cp_amm.BaseFeeParameters{}, errors.New("total periods must be greater than zero")
 	}
 
 	if hold := FeeNumeratorToBps(big.NewInt(constants.MaxFeeNumerator)); maxBaseFeeBps > hold {
-		return types.BaseFee{}, fmt.Errorf("maxBaseFeeBps %d bps exceeds maximum allowed value of %d bps",
+		return cp_amm.BaseFeeParameters{}, fmt.Errorf("maxBaseFeeBps %d bps exceeds maximum allowed value of %d bps",
 			maxBaseFeeBps, hold)
 	}
 
 	if minBaseFeeBps > maxBaseFeeBps {
-		return types.BaseFee{}, errors.New("minBaseFee bps must be less than or equal to maxBaseFee bps")
+		return cp_amm.BaseFeeParameters{}, errors.New("minBaseFee bps must be less than or equal to maxBaseFee bps")
 	}
 
 	if numberOfPeriod == 0 || totalDuration == 0 {
-		return types.BaseFee{}, errors.New("numberOfPeriod and totalDuration must both greater than zero")
+		return cp_amm.BaseFeeParameters{}, errors.New("numberOfPeriod and totalDuration must both greater than zero")
 	}
 
 	maxBaseFeeNumerator, minBaseFeeNumerator, periodFrequency :=
 		BpsToFeeNumerator(maxBaseFeeBps),
 		BpsToFeeNumerator(minBaseFeeBps),
-		new(big.Int).Quo( // TODO: big.Int not needed if these numbers would be small (not overflow)
-			new(big.Int).SetUint64(totalDuration),
-			new(big.Int).SetUint64(numberOfPeriod),
-		)
+		new(big.Int).SetUint64(totalDuration/uint64(numberOfPeriod))
 
-	var reductionFactor *big.Int
-	if feeSchedulerMode == types.Linear {
-		reductionFactor = new(big.Int).Quo(
-			new(big.Int).Sub(maxBaseFeeNumerator, minBaseFeeNumerator),
-			new(big.Int).SetUint64(numberOfPeriod),
-		)
-	} else {
-		ratio := float64(minBaseFeeNumerator.Uint64()) / float64(maxBaseFeeNumerator.Uint64())
-		decayBase := math.Pow(ratio, 1.0/float64(numberOfPeriod))
-		reduction := float64(constants.BasisPointMax) * (1 - decayBase)
-
-		reductionFactor = big.NewInt(int64(reduction))
+	if !maxBaseFeeNumerator.IsUint64() || !periodFrequency.IsUint64() {
+		return cp_amm.BaseFeeParameters{}, fmt.Errorf("either maxBaseFeeNumerator(%s) or periodFrequency(%s) cannot fit into uint64",
+			maxBaseFeeNumerator, periodFrequency)
 	}
 
-	return types.BaseFee{
-		CliffFeeNumerator: maxBaseFeeNumerator,
+	if feeSchedulerMode == types.FeeSchedulerModeLinear {
+		reductionFactor := new(big.Int).Quo(
+			new(big.Int).Sub(maxBaseFeeNumerator, minBaseFeeNumerator),
+			new(big.Int).SetUint64(uint64(numberOfPeriod)),
+		)
+
+		if !reductionFactor.IsUint64() {
+			return cp_amm.BaseFeeParameters{}, fmt.Errorf("cannot fit reductionFactor(%s) into uint64", reductionFactor)
+		}
+
+		return cp_amm.BaseFeeParameters{
+			CliffFeeNumerator: maxBaseFeeNumerator.Uint64(),
+			NumberOfPeriod:    numberOfPeriod,
+			PeriodFrequency:   periodFrequency.Uint64(),
+			ReductionFactor:   reductionFactor.Uint64(),
+			FeeSchedulerMode:  uint8(feeSchedulerMode),
+		}, nil
+
+	}
+
+	ratio := float64(minBaseFeeNumerator.Uint64()) / float64(maxBaseFeeNumerator.Uint64())
+	decayBase := math.Pow(ratio, 1.0/float64(numberOfPeriod))
+	reduction := float64(constants.BasisPointMax) * (1 - decayBase)
+
+	reductionFactor := big.NewInt(int64(reduction))
+
+	return cp_amm.BaseFeeParameters{
+		CliffFeeNumerator: maxBaseFeeNumerator.Uint64(),
 		NumberOfPeriod:    numberOfPeriod,
-		PeriodFrequency:   periodFrequency,
-		ReductionFactor:   reductionFactor,
-		FeeSchedulerMode:  feeSchedulerMode,
+		PeriodFrequency:   periodFrequency.Uint64(),
+		ReductionFactor:   reductionFactor.Uint64(),
+		FeeSchedulerMode:  uint8(feeSchedulerMode),
 	}, nil
 }
 
@@ -583,7 +601,7 @@ func GetSwapResultFromOutAmount(
 	}
 
 	var tDirection types.SwapAmount
-	if tradeDirection == types.AtoB {
+	if tradeDirection == types.TradeDirectionAtoB {
 		if tDirection, err = GetInAmountFromAToB(pool, includedFeeOutAmount); err != nil {
 			return struct {
 				SwapResult  types.SwapResult

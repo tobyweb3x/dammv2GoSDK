@@ -321,8 +321,11 @@ type PoolAccount struct {
 	// metrics
 	Metrics PoolMetrics
 
+	// pool creator
+	Creator ag_solanago.PublicKey
+
 	// Padding for further use
-	Padding1 [10]uint64
+	Padding1 [6]uint64
 
 	// Farming reward information
 	RewardInfos [2]RewardInfo
@@ -473,6 +476,11 @@ func (obj PoolAccount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	}
 	// Serialize `Metrics` param:
 	err = encoder.Encode(obj.Metrics)
+	if err != nil {
+		return err
+	}
+	// Serialize `Creator` param:
+	err = encoder.Encode(obj.Creator)
 	if err != nil {
 		return err
 	}
@@ -640,6 +648,11 @@ func (obj *PoolAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	}
 	// Deserialize `Metrics`:
 	err = decoder.Decode(&obj.Metrics)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Creator`:
+	err = decoder.Decode(&obj.Creator)
 	if err != nil {
 		return err
 	}

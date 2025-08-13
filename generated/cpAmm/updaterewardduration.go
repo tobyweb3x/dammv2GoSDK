@@ -17,7 +17,7 @@ type UpdateRewardDurationInstruction struct {
 
 	// [0] = [WRITE] pool
 	//
-	// [1] = [SIGNER] admin
+	// [1] = [SIGNER] signer
 	//
 	// [2] = [] event_authority
 	//
@@ -56,14 +56,14 @@ func (inst *UpdateRewardDurationInstruction) GetPoolAccount() *ag_solanago.Accou
 	return inst.AccountMetaSlice.Get(0)
 }
 
-// SetAdminAccount sets the "admin" account.
-func (inst *UpdateRewardDurationInstruction) SetAdminAccount(admin ag_solanago.PublicKey) *UpdateRewardDurationInstruction {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(admin).SIGNER()
+// SetSignerAccount sets the "signer" account.
+func (inst *UpdateRewardDurationInstruction) SetSignerAccount(signer ag_solanago.PublicKey) *UpdateRewardDurationInstruction {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(signer).SIGNER()
 	return inst
 }
 
-// GetAdminAccount gets the "admin" account.
-func (inst *UpdateRewardDurationInstruction) GetAdminAccount() *ag_solanago.AccountMeta {
+// GetSignerAccount gets the "signer" account.
+func (inst *UpdateRewardDurationInstruction) GetSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice.Get(1)
 }
 
@@ -165,7 +165,7 @@ func (inst *UpdateRewardDurationInstruction) Validate() error {
 			return errors.New("accounts.Pool is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Admin is not set")
+			return errors.New("accounts.Signer is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.EventAuthority is not set")
@@ -194,7 +194,7 @@ func (inst *UpdateRewardDurationInstruction) EncodeToTree(parent ag_treeout.Bran
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("           pool", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(ag_format.Meta("          admin", inst.AccountMetaSlice.Get(1)))
+						accountsBranch.Child(ag_format.Meta("         signer", inst.AccountMetaSlice.Get(1)))
 						accountsBranch.Child(ag_format.Meta("event_authority", inst.AccountMetaSlice.Get(2)))
 						accountsBranch.Child(ag_format.Meta("        program", inst.AccountMetaSlice.Get(3)))
 					})
@@ -236,14 +236,14 @@ func NewUpdateRewardDurationInstruction(
 	new_duration uint64,
 	// Accounts:
 	pool ag_solanago.PublicKey,
-	admin ag_solanago.PublicKey,
+	signer ag_solanago.PublicKey,
 	eventAuthority ag_solanago.PublicKey,
 	program ag_solanago.PublicKey) *UpdateRewardDurationInstruction {
 	return NewUpdateRewardDurationInstructionBuilder().
 		SetRewardIndex(reward_index).
 		SetNewDuration(new_duration).
 		SetPoolAccount(pool).
-		SetAdminAccount(admin).
+		SetSignerAccount(signer).
 		SetEventAuthorityAccount(eventAuthority).
 		SetProgramAccount(program)
 }

@@ -3,15 +3,15 @@ package types
 type CollectFeeMode uint8
 
 const (
-	BothToken CollectFeeMode = iota
-	OnlyB
+	CollectFeeModeBothToken CollectFeeMode = iota
+	CollectFeeModeOnlyB
 )
 
 type FeeSchedulerMode uint8
 
 const (
-	Linear FeeSchedulerMode = iota
-	Exponential
+	FeeSchedulerModeLinear FeeSchedulerMode = iota
+	FeeSchedulerModeExponential
 )
 
 type Rounding uint8
@@ -24,6 +24,6 @@ const (
 type TradeDirection uint8
 
 const (
-	AtoB TradeDirection = iota
-	BtoA
+	TradeDirectionAtoB TradeDirection = iota
+	TradeDirectionBtoA
 )

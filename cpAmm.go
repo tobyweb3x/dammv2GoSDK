@@ -157,6 +157,14 @@ func (cp CpAMM) GetTokenBadgeAccounts(
 func (cp CpAMM) buildAddLiquidityInstruction(
 	param types.BuildAddLiquidityParams,
 ) (*cp_amm.Instruction, error) {
+
+	// if !param.TokenAAmountThreshold.IsUint64() ||
+	// 	!param.TokenBAmountThreshold.IsUint64() {
+	// 	return nil,
+	// 		fmt.Errorf("cannot fit TokenAAmountThreshold(%s) or TokenBAmountThreshold(%s) into uint64",
+	// 			param.TokenAAmountThreshold, param.TokenBAmountThreshold)
+	// }
+
 	addLiquidityPtr := cp_amm.NewAddLiquidityInstruction(
 		cp_amm.AddLiquidityParameters{
 			LiquidityDelta:        param.LiquidityDelta,
@@ -190,9 +198,16 @@ func (cp CpAMM) buildAddLiquidityInstruction(
 func (cp CpAMM) buildRemoveAllLiquidityInstruction(
 	param types.BuildRemoveAllLiquidityInstructionParams,
 ) (*cp_amm.Instruction, error) {
+
+	// if !param.TokenAAmountThreshold.IsUint64() ||
+	// 	!param.TokenBAmountThreshold.IsUint64() {
+	// 	return nil,
+	// 		fmt.Errorf("cannot fit TokenAAmountThreshold(%s) or TokenBAmountThreshold(%s) into uint64",
+	// 			param.TokenAAmountThreshold, param.TokenBAmountThreshold)
+	// }
+
 	removeLiquidityPtr := cp_amm.NewRemoveLiquidityInstruction(
 		cp_amm.RemoveLiquidityParameters{
-			// LiquidityDelta: ,
 			TokenAAmountThreshold: param.TokenAAmountThreshold,
 			TokenBAmountThreshold: param.TokenBAmountThreshold,
 		},
@@ -959,9 +974,9 @@ func GetQuote(param types.GetQuoteParams) types.GetQuoteResult {
 func GetQuoteExactOut(param types.GetQuoteExactOutParams) (types.QuoteExactOutResult, error) {
 
 	bToA := param.PoolState.TokenAMint.Equals(param.OutputTokenMint)
-	tradeDirection := types.AtoB
+	tradeDirection := types.TradeDirectionAtoB
 	if bToA {
-		tradeDirection = types.BtoA
+		tradeDirection = types.TradeDirectionBtoA
 	}
 
 	currentPoint := param.CurrentSlot
@@ -1264,8 +1279,8 @@ func (cp *CpAMM) CreatePool(
 			Pool:          pool,
 			TokenAMint:    param.TokenAMint,
 			TokenBMint:    param.TokenBMint,
-			TokenAAmount:  param.TokenAAmount.Uint64(),
-			TokenBAmount:  param.TokenBAmount.Uint64(),
+			TokenAAmount:  param.TokenAAmount,
+			TokenBAmount:  param.TokenBAmount,
 			Payer:         param.Payer,
 			PositionNft:   param.PositionNFT,
 			TokenAProgram: param.TokenAProgram,
@@ -1321,10 +1336,14 @@ func (cp *CpAMM) CreatePool(
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
-	accountMetaSlice := slices.Grow(initPoolPtr.AccountMetaSlice, len(createPoolParams.TokenBadgeAccounts))
-	accountMetaSlice = append(accountMetaSlice, createPoolParams.TokenBadgeAccounts...)
-	initPoolPtr.AccountMetaSlice = accountMetaSlice
 
+	eventAuthPDA, _, err := initPoolPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	initPoolPtr.SetEventAuthorityAccount(eventAuthPDA)
+	initPoolPtr.AccountMetaSlice = append(initPoolPtr.AccountMetaSlice, createPoolParams.TokenBadgeAccounts...)
 	currentIx, err := initPoolPtr.ValidateAndBuild()
 	if err != nil {
 		return nil, err
@@ -1380,7 +1399,7 @@ func (cp *CpAMM) CreateCustomPool(
 
 	if param.IsLockLiquidity {
 		permanentLockPtr := cp_amm.NewPermanentLockPositionInstruction(
-			param.LiquidityDelta,
+			helpers.MustBigIntToUint128(param.LiquidityDelta),
 			pool,
 			createPoolParams.Positon,
 			createPoolParams.PositionNftAccount,
@@ -1414,11 +1433,11 @@ func (cp *CpAMM) CreateCustomPool(
 	initCustomizablePoolPtr := cp_amm.NewInitializeCustomizablePoolInstruction(
 		cp_amm.InitializeCustomizablePoolParameters{
 			PoolFees:        param.PoolFees,
-			SqrtMinPrice:    param.SqrtMinPrice,
-			SqrtMaxPrice:    param.SqrtMaxPrice,
+			SqrtMinPrice:    helpers.MustBigIntToUint128(param.SqrtMinPrice),
+			SqrtMaxPrice:    helpers.MustBigIntToUint128(param.SqrtMaxPrice),
 			HasAlphaVault:   param.HasAlphaVault,
-			Liquidity:       param.LiquidityDelta,
-			SqrtPrice:       param.InitSqrtPrice,
+			Liquidity:       helpers.MustBigIntToUint128(param.LiquidityDelta),
+			SqrtPrice:       helpers.MustBigIntToUint128(param.InitSqrtPrice),
 			ActivationType:  param.ActivationType,
 			CollectFeeMode:  param.CollectFeeMode,
 			ActivationPoint: param.ActivationPoint,
@@ -1451,12 +1470,9 @@ func (cp *CpAMM) CreateCustomPool(
 			Ixns     []solana.Instruction
 		}{}, fmt.Errorf("err deriving eventAuthPDA: %w", err)
 	}
+
 	initCustomizablePoolPtr.SetEventAuthorityAccount(eventAuthPDA)
-
-	accountMetaSlice := slices.Grow(initCustomizablePoolPtr.AccountMetaSlice, len(createPoolParams.TokenBadgeAccounts))
-	accountMetaSlice = append(accountMetaSlice, createPoolParams.TokenBadgeAccounts...)
-	initCustomizablePoolPtr.AccountMetaSlice = accountMetaSlice
-
+	initCustomizablePoolPtr.AccountMetaSlice = append(initCustomizablePoolPtr.AccountMetaSlice, createPoolParams.TokenBadgeAccounts...)
 	currentIx, err := initCustomizablePoolPtr.ValidateAndBuild()
 	if err != nil {
 		return struct {
@@ -1517,7 +1533,7 @@ func (cp *CpAMM) CreateCustomPoolWithDynamicConfig(
 	postInstruction := make([]solana.Instruction, 0, 1)
 	if param.IsLockLiquidity {
 		permanentLockIx, err := cp_amm.NewPermanentLockPositionInstruction(
-			param.LiquidityDelta,
+			helpers.MustBigIntToUint128(param.LiquidityDelta),
 			pool,
 			createPoolParams.Positon,
 			createPoolParams.PositionNftAccount,
@@ -1538,11 +1554,11 @@ func (cp *CpAMM) CreateCustomPoolWithDynamicConfig(
 	initPoolWithDynamicConfigPtr := cp_amm.NewInitializePoolWithDynamicConfigInstruction(
 		cp_amm.InitializeCustomizablePoolParameters{
 			PoolFees:        param.PoolFees,
-			SqrtMinPrice:    param.SqrtMinPrice,
-			SqrtMaxPrice:    param.SqrtMaxPrice,
+			SqrtMinPrice:    helpers.MustBigIntToUint128(param.SqrtMinPrice),
+			SqrtMaxPrice:    helpers.MustBigIntToUint128(param.SqrtMaxPrice),
 			HasAlphaVault:   param.HasAlphaVault,
-			Liquidity:       param.LiquidityDelta,
-			SqrtPrice:       param.InitSqrtPrice,
+			Liquidity:       helpers.MustBigIntToUint128(param.LiquidityDelta),
+			SqrtPrice:       helpers.MustBigIntToUint128(param.InitSqrtPrice),
 			ActivationType:  param.ActivationType,
 			ActivationPoint: param.ActivationPoint,
 			CollectFeeMode:  param.CollectFeeMode,
@@ -1569,10 +1585,17 @@ func (cp *CpAMM) CreateCustomPoolWithDynamicConfig(
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
-	accountMetaSlice := slices.Grow(initPoolWithDynamicConfigPtr.AccountMetaSlice, len(createPoolParams.TokenBadgeAccounts))
-	accountMetaSlice = append(accountMetaSlice, createPoolParams.TokenBadgeAccounts...)
-	initPoolWithDynamicConfigPtr.AccountMetaSlice = accountMetaSlice
+	eventAuthPDA, _, err := initPoolWithDynamicConfigPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return struct {
+			Pool     solana.PublicKey
+			Position solana.PublicKey
+			Ixns     []solana.Instruction
+		}{}, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
 
+	initPoolWithDynamicConfigPtr.SetEventAuthorityAccount(eventAuthPDA)
+	initPoolWithDynamicConfigPtr.AccountMetaSlice = append(initPoolWithDynamicConfigPtr.AccountMetaSlice, createPoolParams.TokenBadgeAccounts...)
 	currentIx, err := initPoolWithDynamicConfigPtr.ValidateAndBuild()
 	if err != nil {
 		return struct {
@@ -1635,6 +1658,12 @@ func (cp *CpAMM) AddLiquidity(
 	preInstructions = append(preInstructions, preparedTokenAccs.CreateATAIxns...)
 
 	if param.TokenAMint.Equals(solana.WrappedSol) {
+		// if !param.MaxAmountTokenA.IsUint64() {
+		// 	return nil,
+		// 		fmt.Errorf("cannot fit MaxAmountTokenA(%s) into uint64",
+		// 			param.MaxAmountTokenA)
+		// }
+
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Owner,
 			preparedTokenAccs.TokenAAta,
@@ -1645,6 +1674,12 @@ func (cp *CpAMM) AddLiquidity(
 	}
 
 	if param.TokenBMint.Equals(solana.WrappedSol) {
+		// if !param.MaxAmountTokenB.IsUint64() {
+		// 	return nil,
+		// 		fmt.Errorf("cannot fit MaxAmountTokenB(%s) into uint64",
+		// 			param.MaxAmountTokenB)
+		// }
+
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Owner,
 			preparedTokenAccs.TokenBAta,
@@ -1726,6 +1761,12 @@ func (cp *CpAMM) CreatePositionAndAddLiquidity(
 	preInstructions := make([]solana.Instruction, 0, 2)
 	preInstructions = append(preInstructions, preparedTokenAccs.CreateATAIxns...)
 	if param.TokenAMint.Equals(solana.WrappedSol) {
+		// if !param.MaxAmountTokenA.IsUint64() {
+		// 	return nil,
+		// 		fmt.Errorf("cannot fit MaxAmountTokenA(%s) into uint64",
+		// 			param.MaxAmountTokenA)
+		// }
+
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Owner,
 			preparedTokenAccs.TokenAAta,
@@ -1736,6 +1777,12 @@ func (cp *CpAMM) CreatePositionAndAddLiquidity(
 	}
 
 	if param.TokenBMint.Equals(solana.WrappedSol) {
+		// if !param.MaxAmountTokenB.IsUint64() {
+		// 	return nil,
+		// 		fmt.Errorf("cannot fit MaxAmountTokenB(%s) into uint64",
+		// 			param.MaxAmountTokenB)
+		// }
+
 		wrapSOLIx := helpers.WrapSOLInstruction(
 			param.Owner,
 			preparedTokenAccs.TokenBAta,
@@ -1807,6 +1854,12 @@ func (cp *CpAMM) RemoveLiquidity(
 	ctx context.Context,
 	param types.RemoveLiquidityParams,
 ) ([]solana.Instruction, error) {
+	// if !param.TokenAAmountThreshold.IsUint64() ||
+	// 	!param.TokenBAmountThreshold.IsUint64() {
+	// 	return nil,
+	// 		fmt.Errorf("cannot fit TokenAAmountThreshold(%s) or TokenBAmountThreshold(%s) into uint64",
+	// 			param.TokenAAmountThreshold, param.TokenBAmountThreshold)
+	// }
 
 	preparedTokenAccs, err := cp.prepareTokenAccounts(
 		ctx,
@@ -1906,6 +1959,12 @@ func (cp *CpAMM) RemoveALLLiquidity(
 	ctx context.Context,
 	param types.RemoveAllLiquidityParams,
 ) ([]solana.Instruction, error) {
+	// if !param.TokenAAmountThreshold.IsUint64() ||
+	// 	!param.TokenBAmountThreshold.IsUint64() {
+	// 	return nil,
+	// 		fmt.Errorf("cannot fit TokenAAmountThreshold(%s) or TokenBAmountThreshold(%s) into uint64",
+	// 			param.TokenAAmountThreshold, param.TokenBAmountThreshold)
+	// }
 
 	preparedTokenAccs, err := cp.prepareTokenAccounts(
 		ctx,
@@ -2004,6 +2063,12 @@ func (cp *CpAMM) Swap(
 	ctx context.Context,
 	param types.SwapParams,
 ) ([]solana.Instruction, error) {
+	// if !param.AmountIn.IsUint64() ||
+	// 	!param.MinimumAmountOut.IsUint64() {
+	// 	return nil,
+	// 		fmt.Errorf("cannot fit AmountIn(%s) or MinimumAmountOut(%s) into uint64",
+	// 			param.AmountIn, param.MinimumAmountOut)
+	// }
 
 	inputTokenProgram, outputTokenProgram := param.TokenBProgram, param.TokenAProgram
 	if param.InputTokenMint.Equals(param.TokenAMint) {
@@ -2128,6 +2193,11 @@ func (cp *CpAMM) Swap(
 func (cp *CpAMM) LockPosition(
 	param types.LockPositionParams,
 ) (*cp_amm.Instruction, error) {
+	// if !param.PeriodFrequency.IsUint64() {
+	// 	return nil, fmt.Errorf("cannot fit PeriodFrequency(%s)  into uint64",
+	// 		param.PeriodFrequency)
+	// }
+
 	lockPositionPtr := cp_amm.NewLockPositionInstruction(
 		cp_amm.VestingParameters{
 			CliffPoint:           param.CliffPoint,
@@ -2200,7 +2270,7 @@ func (cp *CpAMM) RemoveAllLiquidityAndClosePosition(
 	canUnlock, reason := cp.CanUnlockPosition(
 		param.PositionState,
 		param.Vestings,
-		new(big.Int).SetUint64(param.CurrentPoint),
+		param.CurrentPoint,
 	)
 
 	if !canUnlock {
@@ -2307,7 +2377,7 @@ func (cp *CpAMM) MergePosition(
 	canUnlock, reason := cp.CanUnlockPosition(
 		param.PositionBState,
 		param.PositionBVestings,
-		new(big.Int).SetUint64(param.CurrentPoint),
+		param.CurrentPoint,
 	)
 
 	if !canUnlock {
@@ -2340,7 +2410,7 @@ func (cp *CpAMM) MergePosition(
 	// 1. refresh vesting position B if vesting account provided
 	if len(param.PositionBVestings) > 0 {
 		vestingAccouts := make([]solana.PublicKey, 0, len(param.PositionBVestings))
-		currentPoint, totalAvailableVestingLiquidity := new(big.Int).SetUint64(param.CurrentPoint), big.NewInt(0)
+		currentPoint, totalAvailableVestingLiquidity := param.CurrentPoint, big.NewInt(0)
 		for _, v := range param.PositionBVestings {
 			available := helpers.GetAvailableVestingLiquidity(
 				v.VestingState,
@@ -2472,28 +2542,47 @@ func (cp *CpAMM) MergePosition(
 func (cp *CpAMM) UpdateRewardDuration(
 	param types.UpdateRewardDurationParams,
 ) (*cp_amm.Instruction, error) {
-	return cp_amm.NewUpdateRewardDurationInstruction(
+	// if !param.NewDuration.IsUint64() {
+	// 	return nil, fmt.Errorf("cannot fit NewDuration(%s)  into uint64",
+	// 		param.NewDuration)
+	// }
+
+	updateRewardDurationPtr := cp_amm.NewUpdateRewardDurationInstruction(
 		param.RewardIndex,
 		param.NewDuration,
 		param.Pool,
 		param.Admin,
 		solana.PublicKey{},
 		CpAMMProgramId,
-	).ValidateAndBuild()
+	)
+	eventAuthPDA, _, err := updateRewardDurationPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	return updateRewardDurationPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 }
 
 // UpdateRewardDuration builds instruction tto update reward funder address.
 func (cp *CpAMM) UpdateRewardFunder(
 	param types.UpdateRewardFunderParams,
 ) (*cp_amm.Instruction, error) {
-	return cp_amm.NewUpdateRewardFunderInstruction(
+	updateRewardFunderPtr := cp_amm.NewUpdateRewardFunderInstruction(
 		param.RewardIndex,
 		param.NewFunder,
 		param.Pool,
 		param.Admin,
 		solana.PublicKey{},
 		CpAMMProgramId,
-	).ValidateAndBuild()
+	)
+	eventAuthPDA, _, err := updateRewardFunderPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	return updateRewardFunderPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 }
 
 // fundReward builds instructions to fund rewards in a pool.
@@ -2503,6 +2592,10 @@ func (cp *CpAMM) fundReward(
 	ctx context.Context,
 	param types.FundRewardParams,
 ) ([]solana.Instruction, error) {
+	// if !param.Amount.IsUint64() {
+	// 	return nil, fmt.Errorf("cannot fit Amount(%s)  into uint64",
+	// 		param.Amount)
+	// }
 
 	poolState, err := cp.FetchPoolState(ctx, param.Pool)
 	if err != nil {
@@ -2538,7 +2631,7 @@ func (cp *CpAMM) fundReward(
 		preInstructions = append(preInstructions, closeWrappedSOLIx...)
 	}
 
-	ix, err := cp_amm.NewFundRewardInstruction(
+	fundRewardPtr := cp_amm.NewFundRewardInstruction(
 		param.RewardIndex,
 		param.Amount,
 		param.CarryForward,
@@ -2550,13 +2643,23 @@ func (cp *CpAMM) fundReward(
 		tokenProgram,
 		solana.PublicKey{},
 		CpAMMProgramId,
-	).ValidateAndBuild()
+	)
+
+	eventAuthPDA, _, err := fundRewardPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	currentIx, err := fundRewardPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
 
-	preInstructions = append(preInstructions, ix)
-	return preInstructions, nil
+	ixns := make([]solana.Instruction, 0, len(preInstructions)+1)
+	ixns = append(ixns, preInstructions...)
+	ixns = append(ixns, currentIx)
+	return ixns, nil
 }
 
 // WithdrawIneligibleReward builds instructions to withdraw ineligible rewards from a pool.
@@ -2568,9 +2671,6 @@ func (cp *CpAMM) WithdrawIneligibleReward(
 	if err != nil {
 		return nil, err
 	}
-
-	preInstructions := make([]solana.Instruction, 0, 1)
-	postInstructions := make([]solana.Instruction, 0, 1)
 
 	rewardInfo := poolState.RewardInfos[param.RewardIndex]
 	tokenProgram := helpers.GetTokenProgram(rewardInfo.RewardTokenFlag)
@@ -2586,9 +2686,8 @@ func (cp *CpAMM) WithdrawIneligibleReward(
 	if err != nil {
 		return nil, err
 	}
-	preInstructions = append(preInstructions, createFunderTokenAccountIx)
 
-	// TODO: check case reward mint is wSOL && carryForward is true => total amount > amount
+	postInstructions := make([]solana.Instruction, 0, 1)
 	if rewardInfo.Mint.Equals(solana.WrappedSol) {
 		closeWrappedSOLIx, err := helpers.UnwrapSOLInstruction(
 			param.Funder, solana.PublicKey{}, false,
@@ -2606,22 +2705,26 @@ func (cp *CpAMM) WithdrawIneligibleReward(
 		rewardInfo.Vault,
 		rewardInfo.Mint,
 		funderTokenAccount,
-		poolState.Partner,
+		param.Funder,
 		tokenProgram,
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
 
-	currentIx, err := withdrawIneligibleRewardPtr.ValidateAndBuild()
+	eventAuthPDA, _, err := withdrawIneligibleRewardPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	currentIx, err := withdrawIneligibleRewardPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
 
-	ixns := make([]solana.Instruction, 0, len(preInstructions)+1+len(postInstructions))
-	ixns = append(ixns, preInstructions...)
-	ixns = append(ixns, currentIx)
+	ixns := make([]solana.Instruction, 0, 1+1+len(postInstructions))
+	ixns = append(ixns, createFunderTokenAccountIx, currentIx)
 	ixns = append(ixns, postInstructions...)
-
 	return ixns, nil
 }
 
@@ -2629,6 +2732,12 @@ func (cp *CpAMM) ClaimPartnerFee(
 	ctx context.Context,
 	param types.ClaimPartnerFeeParams,
 ) ([]solana.Instruction, error) {
+	// if !param.MaxAmountA.IsUint64() ||
+	// 	!param.MaxAmountB.IsUint64() {
+	// 	return nil,
+	// 		fmt.Errorf("cannot fit MaxAmountA(%s) or MaxAmountB(%s) into uint64",
+	// 			param.MaxAmountA, param.MaxAmountB)
+	// }
 
 	poolState, err := cp.FetchPoolState(ctx, param.Pool)
 	if err != nil {
@@ -2677,11 +2786,17 @@ func (cp *CpAMM) ClaimPartnerFee(
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
-	currentIx, err := claimPartnerFeePtr.ValidateAndBuild()
+
+	eventAuthPDA, _, err := claimPartnerFeePtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	currentIx, err := claimPartnerFeePtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
-
 	ixns := make([]solana.Instruction, 0, len(out.PreInstructions)+1+len(out.PostInstructions))
 	ixns = append(ixns, out.PreInstructions...)
 	ixns = append(ixns, currentIx)
@@ -2836,8 +2951,6 @@ func (cp *CpAMM) ClaimReward(
 	rewardInfo := param.PoolState.RewardInfos[param.RewardIndex]
 	tokenProgram := helpers.GetTokenProgram(rewardInfo.RewardTokenFlag)
 
-	postInstructions := make([]solana.Instruction, 0, 2)
-
 	feePayer := param.User
 	if !param.FeePayer.IsZero() {
 		feePayer = param.FeePayer
@@ -2855,8 +2968,8 @@ func (cp *CpAMM) ClaimReward(
 	if err != nil {
 		return nil, err
 	}
-	postInstructions = append(postInstructions, createUserTokenAccountIx)
 
+	postInstructions := make([]solana.Instruction, 0, 1)
 	if rewardInfo.Mint.Equals(solana.WrappedSol) {
 		closeWrappedSOLIx, err := helpers.UnwrapSOLInstruction(
 			param.User, solana.PublicKey{}, false,
@@ -2869,6 +2982,7 @@ func (cp *CpAMM) ClaimReward(
 
 	claimRewardPtr := cp_amm.NewClaimRewardInstruction(
 		param.RewardIndex,
+		param.SkipReward,
 		cp.poolAuthority,
 		param.PositionState.Pool,
 		param.Position,
@@ -2881,15 +2995,50 @@ func (cp *CpAMM) ClaimReward(
 		solana.PublicKey{},
 		CpAMMProgramId,
 	)
+	eventAuthPDA, _, err := claimRewardPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
 
-	currentIx, err := claimRewardPtr.ValidateAndBuild()
+	currentIx, err := claimRewardPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
 
-	ixns := make([]solana.Instruction, 0, 1+len(postInstructions))
-	ixns = append(ixns, currentIx)
+	ixns := make([]solana.Instruction, 0, 1+1+1)
+	ixns = append(ixns, createUserTokenAccountIx, currentIx)
 	ixns = append(ixns, postInstructions...)
-
 	return ixns, nil
+}
+
+func (cp *CpAMM) SplitPosition(
+	param types.SplitPositionParams,
+) (*cp_amm.Instruction, error) {
+	splitPositionPtr := cp_amm.NewSplitPositionInstruction(
+		cp_amm.SplitPositionParameters{
+			PermanentLockedLiquidityPercentage: uint8(param.PermanentLockedLiquidityPercentage),
+			UnlockedLiquidityPercentage:        uint8(param.UnlockedLiquidityPercentage),
+			FeeAPercentage:                     uint8(param.FeeAPercentage),
+			FeeBPercentage:                     uint8(param.FeeBPercentage),
+			Reward0Percentage:                  uint8(param.Reward0Percentage),
+			Reward1Percentage:                  uint8(param.Reward1Percentage),
+		},
+		param.Pool,
+		param.FirstPosition,
+		param.FirstPositionNftAccount,
+		param.SecondPosition,
+		param.SecondPositionNftAccount,
+		param.FirstPositionOwner,
+		param.SecondPositionOwner,
+		solana.PublicKey{},
+		CpAMMProgramId,
+	)
+	eventAuthPDA, _, err := splitPositionPtr.FindEventAuthorityAddress()
+	if err != nil {
+		return nil, fmt.Errorf("err deriving eventAuthPDA: %w", err)
+	}
+
+	return splitPositionPtr.SetEventAuthorityAccount(eventAuthPDA).
+		ValidateAndBuild()
 }

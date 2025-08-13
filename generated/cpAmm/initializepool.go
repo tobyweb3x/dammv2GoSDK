@@ -75,6 +75,7 @@ func NewInitializePoolInstructionBuilder() *InitializePoolInstruction {
 	nd := &InitializePoolInstruction{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 20),
 	}
+	nd.AccountMetaSlice[5] = ag_solanago.Meta(Addresses["HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"])
 	nd.AccountMetaSlice[16] = ag_solanago.Meta(Addresses["TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"])
 	nd.AccountMetaSlice[17] = ag_solanago.Meta(Addresses["11111111111111111111111111111111"])
 	return nd
@@ -197,48 +198,6 @@ func (inst *InitializePoolInstruction) GetConfigAccount() *ag_solanago.AccountMe
 func (inst *InitializePoolInstruction) SetPoolAuthorityAccount(poolAuthority ag_solanago.PublicKey) *InitializePoolInstruction {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(poolAuthority)
 	return inst
-}
-
-func (inst *InitializePoolInstruction) findFindPoolAuthorityAddress(knownBumpSeed uint8) (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	var seeds [][]byte
-	// const: pool_authority
-	seeds = append(seeds, []byte{byte(0x70), byte(0x6f), byte(0x6f), byte(0x6c), byte(0x5f), byte(0x61), byte(0x75), byte(0x74), byte(0x68), byte(0x6f), byte(0x72), byte(0x69), byte(0x74), byte(0x79)})
-
-	if knownBumpSeed != 0 {
-		seeds = append(seeds, []byte{byte(bumpSeed)})
-		pda, err = ag_solanago.CreateProgramAddress(seeds, ProgramID)
-	} else {
-		pda, bumpSeed, err = ag_solanago.FindProgramAddress(seeds, ProgramID)
-	}
-	return
-}
-
-// FindPoolAuthorityAddressWithBumpSeed calculates PoolAuthority account address with given seeds and a known bump seed.
-func (inst *InitializePoolInstruction) FindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey, err error) {
-	pda, _, err = inst.findFindPoolAuthorityAddress(bumpSeed)
-	return
-}
-
-func (inst *InitializePoolInstruction) MustFindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(bumpSeed)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
-// FindPoolAuthorityAddress finds PoolAuthority account address with given seeds.
-func (inst *InitializePoolInstruction) FindPoolAuthorityAddress() (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	pda, bumpSeed, err = inst.findFindPoolAuthorityAddress(0)
-	return
-}
-
-func (inst *InitializePoolInstruction) MustFindPoolAuthorityAddress() (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(0)
-	if err != nil {
-		panic(err)
-	}
-	return
 }
 
 // GetPoolAuthorityAccount gets the "pool_authority" account.

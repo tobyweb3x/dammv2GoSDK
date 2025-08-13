@@ -26,11 +26,6 @@ const (
 	surfPoolWSlient   = "ws://127.0.0.1:8900"
 )
 
-// var (
-// 	conn        = rpc.New(surfPoolRPCClient)
-// 	wsClient, _ = ws.Connect(context.Background(), surfPoolWSlient)
-// )
-
 func TestAddLiquidity(t *testing.T) {
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
@@ -57,18 +52,8 @@ func TestAddLiquidity(t *testing.T) {
 			t.Fatalf("err from SetupTestContext: %s", err.Error())
 		}
 
-		tokenAAmount := new(big.Int).Mul(
-			big.NewInt(1_000),
-			new(big.Int).Exp(big.NewInt(10), big.NewInt(testUtils.Decimals), new(big.Int)),
-		)
-		tokenBAmount := new(big.Int).Mul(
-			big.NewInt(1_000),
-			new(big.Int).Exp(big.NewInt(10), big.NewInt(testUtils.Decimals), new(big.Int)),
-		)
-
-		if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-			t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-		}
+		tokenAAmount := big.NewInt(1_000 * 1_000_000)
+		tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 		poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 			types.PreparePoolCreationParams{
@@ -91,10 +76,10 @@ func TestAddLiquidity(t *testing.T) {
 			TokenBMint:     actors.TokenBMint.PublicKey(),
 			TokenAAmount:   tokenAAmount.Uint64(),
 			TokenBAmount:   tokenBAmount.Uint64(),
-			SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-			SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-			LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-			InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+			SqrtMinPrice:   testUtils.MinSqrtPrice,
+			SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+			LiquidityDelta: poolCreationParams.LiquidityDelta,
+			InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 			PoolFees: cp_amm.PoolFeeParameters{
 				BaseFee: cp_amm.BaseFeeParameters{
 					CliffFeeNumerator: 1_000_000, //1%
@@ -103,10 +88,7 @@ func TestAddLiquidity(t *testing.T) {
 					ReductionFactor:   2,
 					FeeSchedulerMode:  0, // linear
 				},
-				ProtocolFeePercent: 20,
-				PartnerFeePercent:  0,
-				ReferralFeePercent: 20,
-				DynamicFee:         nil,
+				DynamicFee: nil,
 			},
 			ActivationType:  1, // 0 slot, 1 timestap
 			ActivationPoint: nil,
@@ -133,7 +115,6 @@ func TestAddLiquidity(t *testing.T) {
 		}
 
 		assert.NotNil(t, txnSig)
-
 	})
 
 	t.Run("Add liquidity with Token 2022", func(t *testing.T) {
@@ -176,10 +157,6 @@ func TestClaimFee(t *testing.T) {
 		tokenAAmount := new(big.Int).SetUint64(1_000_000 * 1_000_000)
 		tokenBAmount := new(big.Int).SetUint64(100 * 1_000_000)
 
-		if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-			t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-		}
-
 		poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 			types.PreparePoolCreationParams{
 				TokenAAmount: tokenAAmount,
@@ -200,10 +177,10 @@ func TestClaimFee(t *testing.T) {
 			TokenBMint:     solana.WrappedSol,
 			TokenAAmount:   tokenAAmount.Uint64(),
 			TokenBAmount:   tokenBAmount.Uint64(),
-			SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-			SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-			LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-			InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+			SqrtMinPrice:   testUtils.MinSqrtPrice,
+			SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+			LiquidityDelta: poolCreationParams.LiquidityDelta,
+			InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 			PoolFees: cp_amm.PoolFeeParameters{
 				BaseFee: cp_amm.BaseFeeParameters{
 					CliffFeeNumerator: 500_000_000, // 50%
@@ -212,10 +189,7 @@ func TestClaimFee(t *testing.T) {
 					ReductionFactor:   2,
 					FeeSchedulerMode:  0, // linear
 				},
-				ProtocolFeePercent: 20,
-				PartnerFeePercent:  0,
-				ReferralFeePercent: 20,
-				DynamicFee:         nil,
+				DynamicFee: nil,
 			},
 			ActivationType:  1, // 0 slot, 1 timestap
 			CollectFeeMode:  1,
@@ -394,7 +368,7 @@ func TestClaimFee(t *testing.T) {
 }
 
 func TestClaimFee2(t *testing.T) {
-	t.Skip("TestClaimFee2 skippped")
+	// t.Skip("TestClaimFee2 skippped")
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
 	if err != nil {
@@ -429,10 +403,6 @@ func TestClaimFee2(t *testing.T) {
 		tokenAAmount := new(big.Int).SetUint64(1_000_000 * 1_000_000)
 		tokenBAmount := new(big.Int).SetUint64(100 * 1_000_000)
 
-		if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-			t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-		}
-
 		poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 			types.PreparePoolCreationParams{
 				TokenAAmount: tokenAAmount,
@@ -453,10 +423,10 @@ func TestClaimFee2(t *testing.T) {
 			TokenBMint:     solana.WrappedSol,
 			TokenAAmount:   tokenAAmount.Uint64(),
 			TokenBAmount:   tokenBAmount.Uint64(),
-			SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-			SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-			LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-			InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+			SqrtMinPrice:   testUtils.MinSqrtPrice,
+			SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+			LiquidityDelta: poolCreationParams.LiquidityDelta,
+			InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 			PoolFees: cp_amm.PoolFeeParameters{
 				BaseFee: cp_amm.BaseFeeParameters{
 					CliffFeeNumerator: 500_000_000, // 50%
@@ -465,10 +435,7 @@ func TestClaimFee2(t *testing.T) {
 					ReductionFactor:   2,
 					FeeSchedulerMode:  0, // linear
 				},
-				ProtocolFeePercent: 20,
-				PartnerFeePercent:  0,
-				ReferralFeePercent: 20,
-				DynamicFee:         nil,
+				DynamicFee: nil,
 			},
 			ActivationType:  1, // 0 slot, 1 timestap
 			CollectFeeMode:  1,
@@ -702,12 +669,8 @@ func TestClosePosition(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -729,10 +692,10 @@ func TestClosePosition(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -741,10 +704,7 @@ func TestClosePosition(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -781,7 +741,7 @@ func TestClosePosition(t *testing.T) {
 
 		// add liquidity
 		liquidityDelta := dammv2gosdk.GetDepositQuote(types.GetDepositQuoteParams{
-			InAmount:     new(big.Int).SetUint64(1_000 * 1_000_000),
+			InAmount:     big.NewInt(1_000 * 1_000_000),
 			IsTokenA:     true,
 			SqrtPrice:    poolState.SqrtPrice.BigInt(),
 			MinSqrtPrice: poolState.SqrtMinPrice.BigInt(),
@@ -794,8 +754,8 @@ func TestClosePosition(t *testing.T) {
 			Position:              createCustomPoolResult.Position,
 			PositionNftAccount:    dammv2gosdk.DerivePositionNftAccount(positionNFT.PublicKey()),
 			LiquidityDelta:        helpers.MustBigIntToUint128(liquidityDelta.LiquidityDelta),
-			MaxAmountTokenA:       1_000 * 1_000_000,
-			MaxAmountTokenB:       1_000 * 1_000_000,
+			MaxAmountTokenA:       10 * 1_000_000,
+			MaxAmountTokenB:       10 * 1_000_000,
 			TokenAAmountThreshold: math.MaxUint,
 			TokenBAmountThreshold: math.MaxUint,
 			TokenAMint:            poolState.TokenAMint,
@@ -827,7 +787,7 @@ func TestClosePosition(t *testing.T) {
 		removeLiquidityParams := types.RemoveAllLiquidityParams{
 			AddLiquidityParams: addLiquidityParams,
 			Vestings:           nil,
-			CurrentPoint:       0,
+			CurrentPoint:       big.NewInt(0),
 		}
 
 		// remove all liquidity
@@ -912,12 +872,8 @@ func TestCreateCustomizablePool(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -939,10 +895,10 @@ func TestCreateCustomizablePool(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -951,10 +907,7 @@ func TestCreateCustomizablePool(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -988,7 +941,7 @@ func TestCreateCustomizablePool(t *testing.T) {
 }
 
 func TestCreateCustomizablePoolWithConfig(t *testing.T) {
-	t.Skip("TestCreateCustomizablePoolWithConfig skipped")
+	// t.Skip("TestCreateCustomizablePoolWithConfig skipped")
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
 	if err != nil {
@@ -1034,12 +987,8 @@ func TestCreateCustomizablePoolWithConfig(t *testing.T) {
 		t.Log("CreateDynamicConfig was successful ✅")
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -1061,10 +1010,10 @@ func TestCreateCustomizablePoolWithConfig(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -1073,10 +1022,7 @@ func TestCreateCustomizablePoolWithConfig(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -1149,12 +1095,8 @@ func TestCreatePosition(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -1176,10 +1118,10 @@ func TestCreatePosition(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -1188,10 +1130,7 @@ func TestCreatePosition(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -1259,7 +1198,7 @@ func TestFeeHelpers(t *testing.T) {
 		baseFeeParams, err := helpers.GetBaseFeeParams(
 			maxBaseFee,
 			minBaseFee,
-			types.Linear,
+			types.FeeSchedulerModeLinear,
 			120,
 			60,
 		)
@@ -1268,10 +1207,10 @@ func TestFeeHelpers(t *testing.T) {
 		}
 		cliffFeeNumerator := helpers.BpsToFeeNumerator(maxBaseFee)
 		baseFeeNumerator := helpers.GetBaseFeeNumerator(
-			types.Linear,
+			types.FeeSchedulerModeLinear,
 			cliffFeeNumerator,
 			big.NewInt(120),
-			baseFeeParams.ReductionFactor,
+			new(big.Int).SetUint64(baseFeeParams.ReductionFactor),
 		)
 		minBaseFeeNumerator := helpers.BpsToFeeNumerator(minBaseFee)
 
@@ -1285,7 +1224,7 @@ func TestFeeHelpers(t *testing.T) {
 		baseFeeParams, err := helpers.GetBaseFeeParams(
 			maxBaseFee,
 			minBaseFee,
-			types.Exponential,
+			types.FeeSchedulerModeExponential,
 			120,
 			60,
 		)
@@ -1294,11 +1233,12 @@ func TestFeeHelpers(t *testing.T) {
 		}
 		cliffFeeNumerator := helpers.BpsToFeeNumerator(maxBaseFee)
 		baseFeeNumerator := helpers.GetBaseFeeNumerator(
-			types.Exponential,
+			types.FeeSchedulerModeExponential,
 			cliffFeeNumerator,
 			big.NewInt(120),
-			baseFeeParams.ReductionFactor,
+			new(big.Int).SetUint64(baseFeeParams.ReductionFactor),
 		)
+
 		minBaseFeeNumerator := helpers.BpsToFeeNumerator(minBaseFee)
 		diff := math.Abs(float64(minBaseFeeNumerator.Uint64()) - float64(baseFeeNumerator.Uint64()))
 		percentDifference := diff / float64(minBaseFeeNumerator.Uint64()) * 100
@@ -1317,14 +1257,14 @@ func TestFeeHelpers(t *testing.T) {
 			new(big.Int).SetUint64(dynamicFeeParams.MaxVolatilityAccumulator),
 			new(big.Int).SetUint64(uint64(dynamicFeeParams.BinStep)),
 			new(big.Int).SetUint64(dynamicFeeParams.VariableFeeControl),
-		).Uint64()
+		)
 		expectDynamicFeeNumberator := new(big.Int).Div(
 			new(big.Int).Mul(helpers.BpsToFeeNumerator(baseFeeBps), big.NewInt(20)),
 			big.NewInt(100),
-		).Uint64()
+		)
 
-		diff := expectDynamicFeeNumberator - maxDynamicFeeNumerator
-		percentDifference := float64(diff/expectDynamicFeeNumberator) * 100
+		diff := expectDynamicFeeNumberator.Uint64() - maxDynamicFeeNumerator.Uint64()
+		percentDifference := float64(diff/expectDynamicFeeNumberator.Uint64()) * 100
 
 		// less than 1%. Approximate by rounding
 		assert.True(t, percentDifference < 0.1)
@@ -1341,14 +1281,14 @@ func TestFeeHelpers(t *testing.T) {
 			new(big.Int).SetUint64(dynamicFeeParams.MaxVolatilityAccumulator),
 			new(big.Int).SetUint64(uint64(dynamicFeeParams.BinStep)),
 			new(big.Int).SetUint64(dynamicFeeParams.VariableFeeControl),
-		).Uint64()
+		)
 		expectDynamicFeeNumberator := new(big.Int).Div(
 			new(big.Int).Mul(helpers.BpsToFeeNumerator(baseFeeBps), big.NewInt(20)),
 			big.NewInt(100),
-		).Uint64()
+		)
 
-		diff := expectDynamicFeeNumberator - maxDynamicFeeNumerator
-		percentDifference := float64(diff/expectDynamicFeeNumberator) * 100
+		diff := expectDynamicFeeNumberator.Uint64() - maxDynamicFeeNumerator.Uint64()
+		percentDifference := float64(diff/expectDynamicFeeNumberator.Uint64()) * 100
 
 		// less than 0.1%. Approximate by rounding
 		assert.True(t, percentDifference < 0.1)
@@ -1389,12 +1329,8 @@ func TestLockPosition(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -1416,10 +1352,10 @@ func TestLockPosition(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -1428,10 +1364,7 @@ func TestLockPosition(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -1473,7 +1406,7 @@ func TestLockPosition(t *testing.T) {
 
 		// add liquidity
 		liquidityDelta := dammv2gosdk.GetDepositQuote(types.GetDepositQuoteParams{
-			InAmount:     new(big.Int).SetUint64(1_000 * 1_000_000),
+			InAmount:     big.NewInt(1_000 * 1_000_000),
 			IsTokenA:     true,
 			SqrtPrice:    poolState.SqrtPrice.BigInt(),
 			MinSqrtPrice: poolState.SqrtMinPrice.BigInt(),
@@ -1576,7 +1509,7 @@ func TestLockPosition(t *testing.T) {
 
 }
 func TestMergePosition(t *testing.T) {
-	t.Skip("TestMergePosition skipped")
+	// t.Skip("TestMergePosition skipped")
 	conn := rpc.New(surfPoolRPCClient)
 	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
 	if err != nil {
@@ -1608,12 +1541,8 @@ func TestMergePosition(t *testing.T) {
 	}
 
 	{
-		tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-		tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-		if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-			t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-		}
+		tokenAAmount := big.NewInt(1_000 * 1_000_000)
+		tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 		poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 			types.PreparePoolCreationParams{
@@ -1635,10 +1564,10 @@ func TestMergePosition(t *testing.T) {
 			TokenBMint:     actors.TokenBMint.PublicKey(),
 			TokenAAmount:   tokenAAmount.Uint64(),
 			TokenBAmount:   tokenBAmount.Uint64(),
-			SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-			SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-			LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-			InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+			SqrtMinPrice:   testUtils.MinSqrtPrice,
+			SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+			LiquidityDelta: poolCreationParams.LiquidityDelta,
+			InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 			PoolFees: cp_amm.PoolFeeParameters{
 				BaseFee: cp_amm.BaseFeeParameters{
 					CliffFeeNumerator: 1_000_000, // 1%
@@ -1647,10 +1576,7 @@ func TestMergePosition(t *testing.T) {
 					ReductionFactor:   2,
 					FeeSchedulerMode:  0, // linear
 				},
-				ProtocolFeePercent: 20,
-				PartnerFeePercent:  0,
-				ReferralFeePercent: 20,
-				DynamicFee:         nil,
+				DynamicFee: nil,
 			},
 			ActivationType:  1, // 0 slot, 1 timestap
 			CollectFeeMode:  0,
@@ -1687,7 +1613,7 @@ func TestMergePosition(t *testing.T) {
 
 	// add liquidity
 	liquidityDelta := dammv2gosdk.GetDepositQuote(types.GetDepositQuoteParams{
-		InAmount:     new(big.Int).SetUint64(1_000 * 1_000_000),
+		InAmount:     big.NewInt(1_000 * 1_000_000),
 		IsTokenA:     true,
 		SqrtPrice:    poolState.SqrtPrice.BigInt(),
 		MinSqrtPrice: poolState.SqrtMinPrice.BigInt(),
@@ -1809,7 +1735,7 @@ func TestMergePosition(t *testing.T) {
 			TokenAAmountRemoveLiquidityThreshold: 0,
 			TokenBAmountRemoveLiquidityThreshold: 0,
 			PositionBVestings:                    []types.Vesting{},
-			CurrentPoint:                         0,
+			CurrentPoint:                         big.NewInt(0),
 		},
 	)
 
@@ -1860,12 +1786,8 @@ func TestPermanentLockPosition(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -1887,10 +1809,10 @@ func TestPermanentLockPosition(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -1899,10 +1821,7 @@ func TestPermanentLockPosition(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -1944,7 +1863,7 @@ func TestPermanentLockPosition(t *testing.T) {
 
 		// add liquidity
 		liquidityDelta := dammv2gosdk.GetDepositQuote(types.GetDepositQuoteParams{
-			InAmount:     new(big.Int).SetUint64(1_000 * 1_000_000),
+			InAmount:     big.NewInt(1_000 * 1_000_000),
 			IsTokenA:     true,
 			SqrtPrice:    poolState.SqrtPrice.BigInt(),
 			MinSqrtPrice: poolState.SqrtMinPrice.BigInt(),
@@ -2047,12 +1966,8 @@ func TestRemoveLiquidity(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -2074,10 +1989,10 @@ func TestRemoveLiquidity(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -2086,10 +2001,7 @@ func TestRemoveLiquidity(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -2126,7 +2038,7 @@ func TestRemoveLiquidity(t *testing.T) {
 
 		// add liquidity
 		liquidityDelta := dammv2gosdk.GetDepositQuote(types.GetDepositQuoteParams{
-			InAmount:     new(big.Int).SetUint64(1_000 * 1_000_000),
+			InAmount:     big.NewInt(1_000 * 1_000_000),
 			IsTokenA:     true,
 			SqrtPrice:    poolState.SqrtPrice.BigInt(),
 			MinSqrtPrice: poolState.SqrtMinPrice.BigInt(),
@@ -2186,7 +2098,7 @@ func TestRemoveLiquidity(t *testing.T) {
 				TokenAProgram:         helpers.GetTokenProgram(poolState.TokenAFlag),
 				TokenBProgram:         helpers.GetTokenProgram(poolState.TokenBFlag),
 				Vestings:              []types.Vesting{},
-				CurrentPoint:          0,
+				CurrentPoint:          big.NewInt(0),
 			},
 		)
 		if err != nil {
@@ -2206,6 +2118,208 @@ func TestRemoveLiquidity(t *testing.T) {
 
 	t.Run("remove liquidity with Token 2022", func(t *testing.T) {
 	})
+}
+
+func TestSplitPosition(t *testing.T) {
+	conn := rpc.New(surfPoolRPCClient)
+	wsClient, err := ws.Connect(context.Background(), surfPoolWSlient)
+	if err != nil {
+		t.Fatalf("err creating ws client: %s", err.Error())
+	}
+
+	t.Cleanup(func() {
+		conn.Close()
+		wsClient.Close()
+	})
+
+	t.Run("should successfully split position between poolCreator and user", func(t *testing.T) {
+		var (
+			rootKeypair             = solana.NewWallet().PrivateKey
+			customizeablePoolParams types.InitializeCustomizeablePoolParams
+		)
+		actors, err := testUtils.SetupTestContext(
+			t,
+			conn,
+			wsClient,
+			rootKeypair,
+			false,
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("err from SetupTestContext: %s", err.Error())
+		}
+
+		// 1. Create pool with first position (owned by poolCreator)
+		firstPositionNft := solana.NewWallet().PrivateKey
+		{
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
+
+			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
+				types.PreparePoolCreationParams{
+					TokenAAmount: tokenAAmount,
+					TokenBAmount: tokenBAmount,
+					MinSqrtPrice: testUtils.MinSqrtPrice,
+					MaxSqrtPrice: testUtils.MaxSqrtPrice,
+				},
+			)
+			if err != nil {
+				t.Fatalf("err from PreparePoolCreationParams: %s", err.Error())
+			}
+
+			baseFee, err := helpers.GetBaseFeeParams(
+				100, // 1% max fee in bps
+				100, // 1% min fee in bps
+				types.FeeSchedulerModeLinear,
+				0, // numberOfPeriod
+				0, // totalDuration
+			)
+			if err != nil {
+				t.Fatalf("err from GetBaseFeeParams: %s", err.Error())
+			}
+
+			customizeablePoolParams = types.InitializeCustomizeablePoolParams{
+				Payer:          actors.Payer.PublicKey(),
+				Creator:        actors.PoolCreator.PublicKey(),
+				PositionNFT:    firstPositionNft.PublicKey(),
+				TokenAMint:     actors.TokenAMint.PublicKey(),
+				TokenBMint:     actors.TokenBMint.PublicKey(),
+				TokenAAmount:   tokenAAmount.Uint64(),
+				TokenBAmount:   tokenBAmount.Uint64(),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
+				PoolFees: cp_amm.PoolFeeParameters{
+					BaseFee:    baseFee,
+					DynamicFee: nil,
+				},
+				ActivationType:  1, // 0 slot, 1 timestap
+				CollectFeeMode:  0,
+				ActivationPoint: nil,
+				TokenAProgram:   solana.TokenProgramID,
+				TokenBProgram:   solana.TokenProgramID,
+			}
+
+		}
+
+		ammInstance := dammv2gosdk.NewCpAMM(conn)
+		createCustomPoolResult, err := ammInstance.CreateCustomPool(context.Background(), customizeablePoolParams)
+		if err != nil {
+			t.Fatalf("err from CreateCustomPool: %s", err.Error())
+		}
+
+		if _, err = testUtils.ExecuteTransaction(
+			conn,
+			wsClient,
+			createCustomPoolResult.Ixns,
+			actors.Payer,
+			firstPositionNft,
+		); err != nil {
+			testUtils.PrettyPrintTxnErrorLog(t, err)
+			t.FailNow()
+		}
+		t.Log("CreateCustomPool was successful ✅")
+
+		// 2. Create second position (owned by user)
+		secondPositionNft := solana.NewWallet().PrivateKey
+		createPositionParams := types.CreatePositionParams{
+			Owner:       actors.User.PublicKey(),
+			Payer:       actors.User.PublicKey(),
+			Pool:        createCustomPoolResult.Pool,
+			PositionNft: secondPositionNft.PublicKey(),
+		}
+
+		createPositionIx, err := ammInstance.CreatePosition(createPositionParams)
+		if err != nil {
+			t.Fatalf("err from CreatePosition:\n %s", err.Error())
+		}
+
+		if _, err = testUtils.ExecuteTransaction(
+			conn,
+			wsClient,
+			[]solana.Instruction{createPositionIx.Ix},
+			actors.User,
+			secondPositionNft,
+		); err != nil {
+			testUtils.PrettyPrintTxnErrorLog(t, err)
+			t.FailNow()
+		}
+		t.Log("CreatePosition was successful ✅")
+
+		// 3. Execute split position
+		splitPositionParams := types.SplitPositionParams{
+			FirstPositionOwner:  actors.PoolCreator.PublicKey(),
+			SecondPositionOwner: actors.User.PublicKey(),
+			Pool:                createCustomPoolResult.Pool,
+			FirstPosition:       createCustomPoolResult.Position,
+			FirstPositionNftAccount: dammv2gosdk.DerivePositionNftAccount(
+				firstPositionNft.PublicKey(),
+			),
+			SecondPosition: dammv2gosdk.DerivePositionAddress(
+				secondPositionNft.PublicKey(),
+			),
+			SecondPositionNftAccount: dammv2gosdk.DerivePositionNftAccount(
+				secondPositionNft.PublicKey(),
+			),
+			UnlockedLiquidityPercentage: 50,
+			FeeAPercentage:              50,
+			FeeBPercentage:              50,
+			Reward0Percentage:           50,
+			Reward1Percentage:           50,
+		}
+
+		splitPositionIx, err := ammInstance.SplitPosition(splitPositionParams)
+		if err != nil {
+			t.Fatalf("err from CreatePosition:\n %s", err.Error())
+		}
+
+		if _, err = testUtils.ExecuteTransaction(
+			conn,
+			wsClient,
+			[]solana.Instruction{splitPositionIx},
+			actors.PoolCreator,
+			actors.User,
+		); err != nil {
+			testUtils.PrettyPrintTxnErrorLog(t, err)
+			t.FailNow()
+		}
+		t.Log("SplitPosition was successful ✅")
+
+		afterFirstPositionState, err := testUtils.GetPosition(
+			conn,
+			createCustomPoolResult.Position,
+		)
+		if err != nil {
+			t.Fatalf("err from GetPosition:\n %s", err.Error())
+		}
+
+		afterSecondPositionState, err := testUtils.GetPosition(
+			conn,
+			dammv2gosdk.DerivePositionAddress(
+				secondPositionNft.PublicKey(),
+			),
+		)
+		if err != nil {
+			t.Fatalf("err from GetPosition:\n %s", err.Error())
+		}
+
+		assert.True(t, afterFirstPositionState.UnlockedLiquidity.BigInt().Cmp(
+			afterSecondPositionState.UnlockedLiquidity.BigInt(),
+		) == 0)
+
+		assert.True(t, afterFirstPositionState.PermanentLockedLiquidity.BigInt().Cmp(
+			afterSecondPositionState.PermanentLockedLiquidity.BigInt(),
+		) == 0)
+
+		assert.True(t, afterFirstPositionState.FeeAPending == afterSecondPositionState.FeeAPending)
+
+		assert.True(t, afterFirstPositionState.FeeBPending == afterSecondPositionState.FeeBPending)
+	})
+
+	t.Run("Split position with Token 2022", func(t *testing.T) {
+	})
+
 }
 
 func TestSwap(t *testing.T) {
@@ -2240,12 +2354,8 @@ func TestSwap(t *testing.T) {
 		}
 
 		{
-			tokenAAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-			tokenBAmount := new(big.Int).SetUint64(1_000 * 1_000_000)
-
-			if !tokenAAmount.IsUint64() || !tokenBAmount.IsInt64() {
-				t.Fatal("tokenAAmount || tokenBAmount cannot fit into uint64")
-			}
+			tokenAAmount := big.NewInt(1_000 * 1_000_000)
+			tokenBAmount := big.NewInt(1_000 * 1_000_000)
 
 			poolCreationParams, err := dammv2gosdk.PreparePoolCreationParams(
 				types.PreparePoolCreationParams{
@@ -2267,10 +2377,10 @@ func TestSwap(t *testing.T) {
 				TokenBMint:     actors.TokenBMint.PublicKey(),
 				TokenAAmount:   tokenAAmount.Uint64(),
 				TokenBAmount:   tokenBAmount.Uint64(),
-				SqrtMinPrice:   helpers.MustBigIntToUint128(testUtils.MinSqrtPrice),
-				SqrtMaxPrice:   helpers.MustBigIntToUint128(testUtils.MaxSqrtPrice),
-				LiquidityDelta: helpers.MustBigIntToUint128(poolCreationParams.LiquidityDelta),
-				InitSqrtPrice:  helpers.MustBigIntToUint128(poolCreationParams.InitSqrtPrice),
+				SqrtMinPrice:   testUtils.MinSqrtPrice,
+				SqrtMaxPrice:   testUtils.MaxSqrtPrice,
+				LiquidityDelta: poolCreationParams.LiquidityDelta,
+				InitSqrtPrice:  poolCreationParams.InitSqrtPrice,
 				PoolFees: cp_amm.PoolFeeParameters{
 					BaseFee: cp_amm.BaseFeeParameters{
 						CliffFeeNumerator: 1_000_000, // 1%
@@ -2279,10 +2389,7 @@ func TestSwap(t *testing.T) {
 						ReductionFactor:   2,
 						FeeSchedulerMode:  0, // linear
 					},
-					ProtocolFeePercent: 20,
-					PartnerFeePercent:  0,
-					ReferralFeePercent: 20,
-					DynamicFee:         nil,
+					DynamicFee: nil,
 				},
 				ActivationType:  1, // 0 slot, 1 timestap
 				CollectFeeMode:  0,
@@ -2319,7 +2426,7 @@ func TestSwap(t *testing.T) {
 
 		// add liquidity
 		liquidityDelta := dammv2gosdk.GetDepositQuote(types.GetDepositQuoteParams{
-			InAmount:     new(big.Int).SetUint64(1_000 * 1_000_000),
+			InAmount:     big.NewInt(1_000 * 1_000_000),
 			IsTokenA:     true,
 			SqrtPrice:    poolState.SqrtPrice.BigInt(),
 			MinSqrtPrice: poolState.SqrtMinPrice.BigInt(),

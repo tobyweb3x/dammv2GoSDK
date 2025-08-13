@@ -13,6 +13,7 @@ import (
 // ClaimReward is the `claim_reward` instruction.
 type ClaimRewardInstruction struct {
 	RewardIndex *uint8
+	SkipReward  *uint8
 
 	// [0] = [] pool_authority
 	//
@@ -46,6 +47,7 @@ func NewClaimRewardInstructionBuilder() *ClaimRewardInstruction {
 	nd := &ClaimRewardInstruction{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 11),
 	}
+	nd.AccountMetaSlice[0] = ag_solanago.Meta(Addresses["HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"])
 	return nd
 }
 
@@ -55,52 +57,16 @@ func (inst *ClaimRewardInstruction) SetRewardIndex(reward_index uint8) *ClaimRew
 	return inst
 }
 
+// SetSkipReward sets the "skip_reward" parameter.
+func (inst *ClaimRewardInstruction) SetSkipReward(skip_reward uint8) *ClaimRewardInstruction {
+	inst.SkipReward = &skip_reward
+	return inst
+}
+
 // SetPoolAuthorityAccount sets the "pool_authority" account.
 func (inst *ClaimRewardInstruction) SetPoolAuthorityAccount(poolAuthority ag_solanago.PublicKey) *ClaimRewardInstruction {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(poolAuthority)
 	return inst
-}
-
-func (inst *ClaimRewardInstruction) findFindPoolAuthorityAddress(knownBumpSeed uint8) (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	var seeds [][]byte
-	// const: pool_authority
-	seeds = append(seeds, []byte{byte(0x70), byte(0x6f), byte(0x6f), byte(0x6c), byte(0x5f), byte(0x61), byte(0x75), byte(0x74), byte(0x68), byte(0x6f), byte(0x72), byte(0x69), byte(0x74), byte(0x79)})
-
-	if knownBumpSeed != 0 {
-		seeds = append(seeds, []byte{byte(bumpSeed)})
-		pda, err = ag_solanago.CreateProgramAddress(seeds, ProgramID)
-	} else {
-		pda, bumpSeed, err = ag_solanago.FindProgramAddress(seeds, ProgramID)
-	}
-	return
-}
-
-// FindPoolAuthorityAddressWithBumpSeed calculates PoolAuthority account address with given seeds and a known bump seed.
-func (inst *ClaimRewardInstruction) FindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey, err error) {
-	pda, _, err = inst.findFindPoolAuthorityAddress(bumpSeed)
-	return
-}
-
-func (inst *ClaimRewardInstruction) MustFindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(bumpSeed)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
-// FindPoolAuthorityAddress finds PoolAuthority account address with given seeds.
-func (inst *ClaimRewardInstruction) FindPoolAuthorityAddress() (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	pda, bumpSeed, err = inst.findFindPoolAuthorityAddress(0)
-	return
-}
-
-func (inst *ClaimRewardInstruction) MustFindPoolAuthorityAddress() (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(0)
-	if err != nil {
-		panic(err)
-	}
-	return
 }
 
 // GetPoolAuthorityAccount gets the "pool_authority" account.
@@ -289,6 +255,9 @@ func (inst *ClaimRewardInstruction) Validate() error {
 		if inst.RewardIndex == nil {
 			return errors.New("RewardIndex parameter is not set")
 		}
+		if inst.SkipReward == nil {
+			return errors.New("SkipReward parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -339,8 +308,9 @@ func (inst *ClaimRewardInstruction) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param(" RewardIndex", *inst.RewardIndex))
+						paramsBranch.Child(ag_format.Param("  SkipReward", *inst.SkipReward))
 					})
 
 					// Accounts of the instruction:
@@ -367,11 +337,21 @@ func (obj ClaimRewardInstruction) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	if err != nil {
 		return err
 	}
+	// Serialize `SkipReward` param:
+	err = encoder.Encode(obj.SkipReward)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *ClaimRewardInstruction) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `RewardIndex`:
 	err = decoder.Decode(&obj.RewardIndex)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SkipReward`:
+	err = decoder.Decode(&obj.SkipReward)
 	if err != nil {
 		return err
 	}
@@ -382,6 +362,7 @@ func (obj *ClaimRewardInstruction) UnmarshalWithDecoder(decoder *ag_binary.Decod
 func NewClaimRewardInstruction(
 	// Parameters:
 	reward_index uint8,
+	skip_reward uint8,
 	// Accounts:
 	poolAuthority ag_solanago.PublicKey,
 	pool ag_solanago.PublicKey,
@@ -396,6 +377,7 @@ func NewClaimRewardInstruction(
 	program ag_solanago.PublicKey) *ClaimRewardInstruction {
 	return NewClaimRewardInstructionBuilder().
 		SetRewardIndex(reward_index).
+		SetSkipReward(skip_reward).
 		SetPoolAuthorityAccount(poolAuthority).
 		SetPoolAccount(pool).
 		SetPositionAccount(position).

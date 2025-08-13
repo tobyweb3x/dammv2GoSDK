@@ -250,8 +250,8 @@ type CreatePoolParams struct {
 	TokenBMint      solana.PublicKey
 	InitSqrtPrice   ag_binary.Uint128
 	LiquidityDelta  ag_binary.Uint128
-	TokenAAmount    *big.Int
-	TokenBAmount    *big.Int
+	TokenAAmount    uint64
+	TokenBAmount    uint64
 	ActivationPoint *uint64
 	TokenAProgram   solana.PublicKey
 	TokenBProgram   solana.PublicKey
@@ -260,9 +260,9 @@ type CreatePoolParams struct {
 
 type PoolFeesParams struct {
 	BaseFee            BaseFee
-	ProtocolFeePercent uint8
-	PartnerFeePercent  uint8
-	ReferralFeePercent uint8
+	ProtocolFeePercent float64
+	PartnerFeePercent  float64
+	ReferralFeePercent float64
 	DynamicFee         *DynamicFee
 }
 
@@ -292,10 +292,10 @@ type InitializeCustomizeablePoolParams struct {
 	TokenBMint      solana.PublicKey
 	TokenAAmount    uint64
 	TokenBAmount    uint64
-	SqrtMinPrice    ag_binary.Uint128
-	SqrtMaxPrice    ag_binary.Uint128
-	LiquidityDelta  ag_binary.Uint128
-	InitSqrtPrice   ag_binary.Uint128
+	SqrtMinPrice    *big.Int
+	SqrtMaxPrice    *big.Int
+	LiquidityDelta  *big.Int
+	InitSqrtPrice   *big.Int
 	PoolFees        cp_amm.PoolFeeParameters
 	HasAlphaVault   bool
 	ActivationType  uint8
@@ -303,7 +303,7 @@ type InitializeCustomizeablePoolParams struct {
 	ActivationPoint *uint64
 	TokenAProgram   solana.PublicKey
 	TokenBProgram   solana.PublicKey
-	IsLockLiquidity bool // optional flag, default false
+	IsLockLiquidity bool
 }
 
 type InitializeCustomizeablePoolWithDynamicConfigParams struct {
@@ -365,13 +365,13 @@ type RemoveLiquidityParams struct {
 	TokenAProgram         solana.PublicKey
 	TokenBProgram         solana.PublicKey
 	Vestings              []Vesting
-	CurrentPoint          uint64
+	CurrentPoint          *big.Int
 }
 
 type RemoveAllLiquidityParams struct {
 	AddLiquidityParams
 	Vestings     []Vesting
-	CurrentPoint uint64
+	CurrentPoint *big.Int
 }
 
 type SwapParams struct {
@@ -420,7 +420,7 @@ type RemoveAllLiquidityAndClosePositionParams struct {
 	TokenAAmountThreshold uint64
 	TokenBAmountThreshold uint64
 	Vestings              []Vesting
-	CurrentPoint          uint64
+	CurrentPoint          *big.Int
 }
 
 type MergePositionParams struct {
@@ -436,7 +436,7 @@ type MergePositionParams struct {
 	TokenAAmountRemoveLiquidityThreshold uint64
 	TokenBAmountRemoveLiquidityThreshold uint64
 	PositionBVestings                    []Vesting
-	CurrentPoint                         uint64
+	CurrentPoint                         *big.Int
 }
 
 type UpdateRewardDurationParams struct {
@@ -509,13 +509,13 @@ type ClaimPositionFeeParams2 struct {
 }
 
 type ClaimRewardParams struct {
-	User               solana.PublicKey
-	Position           solana.PublicKey
-	PoolState          *cp_amm.PoolAccount
-	PositionState      *cp_amm.PositionAccount
-	PositionNftAccount solana.PublicKey
-	RewardIndex        uint8
-	FeePayer           solana.PublicKey
+	User                    solana.PublicKey
+	Position                solana.PublicKey
+	PoolState               *cp_amm.PoolAccount
+	PositionState           *cp_amm.PositionAccount
+	PositionNftAccount      solana.PublicKey
+	RewardIndex, SkipReward uint8
+	FeePayer                solana.PublicKey
 }
 
 type SwapAmount struct {
@@ -535,7 +535,7 @@ type GetQuoteExactOutParams struct {
 	OutputTokenMint solana.PublicKey
 	Slippage        float64
 	PoolState       *cp_amm.PoolAccount
-	CurrentTime     int64
+	CurrentTime     uint64
 	CurrentSlot     uint64
 	InputTokenInfo  *TokenEpochInfo
 	OutputTokenInfo *TokenEpochInfo
@@ -546,4 +546,20 @@ type QuoteExactOutResult struct {
 	InputAmount    *big.Int
 	MaxInputAmount *big.Int
 	PriceImpact    float64
+}
+
+type SplitPositionParams struct {
+	FirstPositionOwner                 solana.PublicKey
+	SecondPositionOwner                solana.PublicKey
+	Pool                               solana.PublicKey
+	FirstPosition                      solana.PublicKey
+	FirstPositionNftAccount            solana.PublicKey
+	SecondPosition                     solana.PublicKey
+	SecondPositionNftAccount           solana.PublicKey
+	PermanentLockedLiquidityPercentage float64
+	UnlockedLiquidityPercentage        float64
+	FeeAPercentage                     float64
+	FeeBPercentage                     float64
+	Reward0Percentage                  float64
+	Reward1Percentage                  float64
 }

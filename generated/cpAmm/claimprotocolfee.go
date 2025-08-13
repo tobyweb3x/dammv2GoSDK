@@ -12,6 +12,8 @@ import (
 
 // ClaimProtocolFee is the `claim_protocol_fee` instruction.
 type ClaimProtocolFeeInstruction struct {
+	MaxAmountA *uint64
+	MaxAmountB *uint64
 
 	// [0] = [] pool_authority
 	//
@@ -58,55 +60,26 @@ func NewClaimProtocolFeeInstructionBuilder() *ClaimProtocolFeeInstruction {
 	nd := &ClaimProtocolFeeInstruction{
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 14),
 	}
+	nd.AccountMetaSlice[0] = ag_solanago.Meta(Addresses["HLnpSz9h2S4hiLQ43rnSD9XkcUThA7B8hQMKmDaiTLcC"])
 	return nd
+}
+
+// SetMaxAmountA sets the "max_amount_a" parameter.
+func (inst *ClaimProtocolFeeInstruction) SetMaxAmountA(max_amount_a uint64) *ClaimProtocolFeeInstruction {
+	inst.MaxAmountA = &max_amount_a
+	return inst
+}
+
+// SetMaxAmountB sets the "max_amount_b" parameter.
+func (inst *ClaimProtocolFeeInstruction) SetMaxAmountB(max_amount_b uint64) *ClaimProtocolFeeInstruction {
+	inst.MaxAmountB = &max_amount_b
+	return inst
 }
 
 // SetPoolAuthorityAccount sets the "pool_authority" account.
 func (inst *ClaimProtocolFeeInstruction) SetPoolAuthorityAccount(poolAuthority ag_solanago.PublicKey) *ClaimProtocolFeeInstruction {
 	inst.AccountMetaSlice[0] = ag_solanago.Meta(poolAuthority)
 	return inst
-}
-
-func (inst *ClaimProtocolFeeInstruction) findFindPoolAuthorityAddress(knownBumpSeed uint8) (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	var seeds [][]byte
-	// const: pool_authority
-	seeds = append(seeds, []byte{byte(0x70), byte(0x6f), byte(0x6f), byte(0x6c), byte(0x5f), byte(0x61), byte(0x75), byte(0x74), byte(0x68), byte(0x6f), byte(0x72), byte(0x69), byte(0x74), byte(0x79)})
-
-	if knownBumpSeed != 0 {
-		seeds = append(seeds, []byte{byte(bumpSeed)})
-		pda, err = ag_solanago.CreateProgramAddress(seeds, ProgramID)
-	} else {
-		pda, bumpSeed, err = ag_solanago.FindProgramAddress(seeds, ProgramID)
-	}
-	return
-}
-
-// FindPoolAuthorityAddressWithBumpSeed calculates PoolAuthority account address with given seeds and a known bump seed.
-func (inst *ClaimProtocolFeeInstruction) FindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey, err error) {
-	pda, _, err = inst.findFindPoolAuthorityAddress(bumpSeed)
-	return
-}
-
-func (inst *ClaimProtocolFeeInstruction) MustFindPoolAuthorityAddressWithBumpSeed(bumpSeed uint8) (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(bumpSeed)
-	if err != nil {
-		panic(err)
-	}
-	return
-}
-
-// FindPoolAuthorityAddress finds PoolAuthority account address with given seeds.
-func (inst *ClaimProtocolFeeInstruction) FindPoolAuthorityAddress() (pda ag_solanago.PublicKey, bumpSeed uint8, err error) {
-	pda, bumpSeed, err = inst.findFindPoolAuthorityAddress(0)
-	return
-}
-
-func (inst *ClaimProtocolFeeInstruction) MustFindPoolAuthorityAddress() (pda ag_solanago.PublicKey) {
-	pda, _, err := inst.findFindPoolAuthorityAddress(0)
-	if err != nil {
-		panic(err)
-	}
-	return
 }
 
 // GetPoolAuthorityAccount gets the "pool_authority" account.
@@ -433,6 +406,16 @@ func (inst ClaimProtocolFeeInstruction) ValidateAndBuild() (*Instruction, error)
 }
 
 func (inst *ClaimProtocolFeeInstruction) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.MaxAmountA == nil {
+			return errors.New("MaxAmountA parameter is not set")
+		}
+		if inst.MaxAmountB == nil {
+			return errors.New("MaxAmountB parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -490,7 +473,10 @@ func (inst *ClaimProtocolFeeInstruction) EncodeToTree(parent ag_treeout.Branches
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("  MaxAmountA", *inst.MaxAmountA))
+						paramsBranch.Child(ag_format.Param("  MaxAmountB", *inst.MaxAmountB))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=14]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -514,14 +500,37 @@ func (inst *ClaimProtocolFeeInstruction) EncodeToTree(parent ag_treeout.Branches
 }
 
 func (obj ClaimProtocolFeeInstruction) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `MaxAmountA` param:
+	err = encoder.Encode(obj.MaxAmountA)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxAmountB` param:
+	err = encoder.Encode(obj.MaxAmountB)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *ClaimProtocolFeeInstruction) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `MaxAmountA`:
+	err = decoder.Decode(&obj.MaxAmountA)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxAmountB`:
+	err = decoder.Decode(&obj.MaxAmountB)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewClaimProtocolFeeInstruction declares a new ClaimProtocolFee instruction with the provided parameters and accounts.
 func NewClaimProtocolFeeInstruction(
+	// Parameters:
+	max_amount_a uint64,
+	max_amount_b uint64,
 	// Accounts:
 	poolAuthority ag_solanago.PublicKey,
 	pool ag_solanago.PublicKey,
@@ -538,6 +547,8 @@ func NewClaimProtocolFeeInstruction(
 	eventAuthority ag_solanago.PublicKey,
 	program ag_solanago.PublicKey) *ClaimProtocolFeeInstruction {
 	return NewClaimProtocolFeeInstructionBuilder().
+		SetMaxAmountA(max_amount_a).
+		SetMaxAmountB(max_amount_b).
 		SetPoolAuthorityAccount(poolAuthority).
 		SetPoolAccount(pool).
 		SetTokenAVaultAccount(tokenAVault).

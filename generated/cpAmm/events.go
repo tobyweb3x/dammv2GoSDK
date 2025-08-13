@@ -1052,6 +1052,9 @@ type EvtFundRewardEventData struct {
 	RewardIndex                 uint8
 	Amount                      uint64
 	TransferFeeExcludedAmountIn uint64
+	RewardDurationEnd           uint64
+	PreRewardRate               ag_binary.Uint128
+	PostRewardRate              ag_binary.Uint128
 }
 
 var EvtFundRewardEventDataDiscriminator = [8]byte{104, 233, 237, 122, 199, 191, 121, 85}
@@ -1089,6 +1092,21 @@ func (obj EvtFundRewardEventData) MarshalWithEncoder(encoder *ag_binary.Encoder)
 	}
 	// Serialize `TransferFeeExcludedAmountIn` param:
 	err = encoder.Encode(obj.TransferFeeExcludedAmountIn)
+	if err != nil {
+		return err
+	}
+	// Serialize `RewardDurationEnd` param:
+	err = encoder.Encode(obj.RewardDurationEnd)
+	if err != nil {
+		return err
+	}
+	// Serialize `PreRewardRate` param:
+	err = encoder.Encode(obj.PreRewardRate)
+	if err != nil {
+		return err
+	}
+	// Serialize `PostRewardRate` param:
+	err = encoder.Encode(obj.PostRewardRate)
 	if err != nil {
 		return err
 	}
@@ -1136,6 +1154,21 @@ func (obj *EvtFundRewardEventData) UnmarshalWithDecoder(decoder *ag_binary.Decod
 	}
 	// Deserialize `TransferFeeExcludedAmountIn`:
 	err = decoder.Decode(&obj.TransferFeeExcludedAmountIn)
+	if err != nil {
+		return err
+	}
+	// Deserialize `RewardDurationEnd`:
+	err = decoder.Decode(&obj.RewardDurationEnd)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PreRewardRate`:
+	err = decoder.Decode(&obj.PreRewardRate)
+	if err != nil {
+		return err
+	}
+	// Deserialize `PostRewardRate`:
+	err = decoder.Decode(&obj.PostRewardRate)
 	if err != nil {
 		return err
 	}
@@ -1418,6 +1451,7 @@ type EvtInitializeRewardEventData struct {
 	Pool           ag_solanago.PublicKey
 	RewardMint     ag_solanago.PublicKey
 	Funder         ag_solanago.PublicKey
+	Creator        ag_solanago.PublicKey
 	RewardIndex    uint8
 	RewardDuration uint64
 }
@@ -1442,6 +1476,11 @@ func (obj EvtInitializeRewardEventData) MarshalWithEncoder(encoder *ag_binary.En
 	}
 	// Serialize `Funder` param:
 	err = encoder.Encode(obj.Funder)
+	if err != nil {
+		return err
+	}
+	// Serialize `Creator` param:
+	err = encoder.Encode(obj.Creator)
 	if err != nil {
 		return err
 	}
@@ -1484,6 +1523,11 @@ func (obj *EvtInitializeRewardEventData) UnmarshalWithDecoder(decoder *ag_binary
 	}
 	// Deserialize `Funder`:
 	err = decoder.Decode(&obj.Funder)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Creator`:
+	err = decoder.Decode(&obj.Creator)
 	if err != nil {
 		return err
 	}
@@ -1880,6 +1924,152 @@ func (obj *EvtSetPoolStatusEventData) Self() any {
 	return obj
 }
 
+type EvtSplitPositionEventData struct {
+	Pool                    ag_solanago.PublicKey
+	FirstOwner              ag_solanago.PublicKey
+	SecondOwner             ag_solanago.PublicKey
+	FirstPosition           ag_solanago.PublicKey
+	SecondPosition          ag_solanago.PublicKey
+	CurrentSqrtPrice        ag_binary.Uint128
+	AmountSplits            SplitAmountInfo
+	FirstPositionInfo       SplitPositionInfo
+	SecondPositionInfo      SplitPositionInfo
+	SplitPositionParameters SplitPositionParameters
+}
+
+var EvtSplitPositionEventDataDiscriminator = [8]byte{182, 138, 42, 254, 27, 94, 82, 221}
+
+func (obj EvtSplitPositionEventData) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(EvtSplitPositionEventDataDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Pool` param:
+	err = encoder.Encode(obj.Pool)
+	if err != nil {
+		return err
+	}
+	// Serialize `FirstOwner` param:
+	err = encoder.Encode(obj.FirstOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `SecondOwner` param:
+	err = encoder.Encode(obj.SecondOwner)
+	if err != nil {
+		return err
+	}
+	// Serialize `FirstPosition` param:
+	err = encoder.Encode(obj.FirstPosition)
+	if err != nil {
+		return err
+	}
+	// Serialize `SecondPosition` param:
+	err = encoder.Encode(obj.SecondPosition)
+	if err != nil {
+		return err
+	}
+	// Serialize `CurrentSqrtPrice` param:
+	err = encoder.Encode(obj.CurrentSqrtPrice)
+	if err != nil {
+		return err
+	}
+	// Serialize `AmountSplits` param:
+	err = encoder.Encode(obj.AmountSplits)
+	if err != nil {
+		return err
+	}
+	// Serialize `FirstPositionInfo` param:
+	err = encoder.Encode(obj.FirstPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Serialize `SecondPositionInfo` param:
+	err = encoder.Encode(obj.SecondPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Serialize `SplitPositionParameters` param:
+	err = encoder.Encode(obj.SplitPositionParameters)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *EvtSplitPositionEventData) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(EvtSplitPositionEventDataDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[182 138 42 254 27 94 82 221]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Pool`:
+	err = decoder.Decode(&obj.Pool)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FirstOwner`:
+	err = decoder.Decode(&obj.FirstOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SecondOwner`:
+	err = decoder.Decode(&obj.SecondOwner)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FirstPosition`:
+	err = decoder.Decode(&obj.FirstPosition)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SecondPosition`:
+	err = decoder.Decode(&obj.SecondPosition)
+	if err != nil {
+		return err
+	}
+	// Deserialize `CurrentSqrtPrice`:
+	err = decoder.Decode(&obj.CurrentSqrtPrice)
+	if err != nil {
+		return err
+	}
+	// Deserialize `AmountSplits`:
+	err = decoder.Decode(&obj.AmountSplits)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FirstPositionInfo`:
+	err = decoder.Decode(&obj.FirstPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SecondPositionInfo`:
+	err = decoder.Decode(&obj.SecondPositionInfo)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SplitPositionParameters`:
+	err = decoder.Decode(&obj.SplitPositionParameters)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (*EvtSplitPositionEventData) isEventData() {}
+func (obj *EvtSplitPositionEventData) Self() any {
+	return obj
+}
+
 type EvtSwapEventData struct {
 	Pool             ag_solanago.PublicKey
 	TradeDirection   uint8
@@ -2243,6 +2433,7 @@ var eventTypes = map[[8]byte]reflect.Type{
 	EvtPermanentLockPositionEventDataDiscriminator:    reflect.TypeOf(EvtPermanentLockPositionEventData{}),
 	EvtRemoveLiquidityEventDataDiscriminator:          reflect.TypeOf(EvtRemoveLiquidityEventData{}),
 	EvtSetPoolStatusEventDataDiscriminator:            reflect.TypeOf(EvtSetPoolStatusEventData{}),
+	EvtSplitPositionEventDataDiscriminator:            reflect.TypeOf(EvtSplitPositionEventData{}),
 	EvtSwapEventDataDiscriminator:                     reflect.TypeOf(EvtSwapEventData{}),
 	EvtUpdateRewardDurationEventDataDiscriminator:     reflect.TypeOf(EvtUpdateRewardDurationEventData{}),
 	EvtUpdateRewardFunderEventDataDiscriminator:       reflect.TypeOf(EvtUpdateRewardFunderEventData{}),
@@ -2269,6 +2460,7 @@ var eventNames = map[[8]byte]string{
 	EvtPermanentLockPositionEventDataDiscriminator:    "EvtPermanentLockPosition",
 	EvtRemoveLiquidityEventDataDiscriminator:          "EvtRemoveLiquidity",
 	EvtSetPoolStatusEventDataDiscriminator:            "EvtSetPoolStatus",
+	EvtSplitPositionEventDataDiscriminator:            "EvtSplitPosition",
 	EvtSwapEventDataDiscriminator:                     "EvtSwap",
 	EvtUpdateRewardDurationEventDataDiscriminator:     "EvtUpdateRewardDuration",
 	EvtUpdateRewardFunderEventDataDiscriminator:       "EvtUpdateRewardFunder",
