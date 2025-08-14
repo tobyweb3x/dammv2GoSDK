@@ -2,23 +2,9 @@ package maths
 
 import (
 	"errors"
-	"fmt"
+	"math"
 	"math/big"
-
-	"github.com/shopspring/decimal"
 )
-
-// decimalSqrt computes the square root of a decimal using big.Float for precision.
-func decimalSqrt(d decimal.Decimal) (decimal.Decimal, error) {
-	f, ok := new(big.Float).SetString(d.String())
-	if !ok {
-		return decimal.Zero, fmt.Errorf("bad decimal: %s", d)
-	}
-	f.SetPrec(256)
-	root := new(big.Float).Sqrt(f) // √
-	s := root.Text('f', -1)
-	return decimal.NewFromString(s)
-}
 
 // CalculateInitSqrtPrice calculates the initial sqrt price based on token amounts and price bounds.
 //
@@ -40,31 +26,40 @@ func CalculateInitSqrtPrice(
 		return nil, errors.New("amount cannot be zero")
 	}
 
-	amountADec := decimal.NewFromBigInt(tokenAAmount, 0)
-	amountBDec := decimal.NewFromBigInt(tokenBAmount, 0)
-	scale := decimal.NewFromBigInt(
-		new(big.Int).Lsh(big.NewInt(1), 64), 0) // 2^64
+	amountADecimal, amountBDecimal :=
+		new(big.Float).SetInt(tokenAAmount), new(big.Float).SetInt(tokenBAmount)
 
-	minSqrtPriceDec := decimal.NewFromBigInt(minSqrtPrice, 0).Div(scale)
-	maxSqrtPriceDec := decimal.NewFromBigInt(maxSqrtPrice, 0).Div(scale)
+	minSqrtPriceDecimal := new(big.Float).Quo(
+		new(big.Float).SetInt(minSqrtPrice), big.NewFloat(math.Pow(2, 64)),
+	)
 
-	x := decimal.NewFromInt(1).Div(maxSqrtPriceDec)
-	y := amountBDec.Div(amountADec)
-	xy := x.Mul(y)
+	maxSqrtPriceDecimal := new(big.Float).Quo(
+		new(big.Float).SetInt(maxSqrtPrice), big.NewFloat(math.Pow(2, 64)),
+	)
 
-	paMinusXY := minSqrtPriceDec.Sub(xy)
-	xyMinusPa := xy.Sub(minSqrtPriceDec)
+	x, y :=
+		new(big.Float).Quo(big.NewFloat(1), maxSqrtPriceDecimal),
+		new(big.Float).Quo(amountBDecimal, amountADecimal)
+	xy := new(big.Float).Mul(x, y)
 
-	discriminant := xyMinusPa.Mul(xyMinusPa).Add(y.Mul(decimal.NewFromInt(4)))
+	paMinusXY, xyMinusPa :=
+		new(big.Float).Sub(minSqrtPriceDecimal, xy),
+		new(big.Float).Sub(xy, minSqrtPriceDecimal)
+
+	fourY := new(big.Float).Mul(big.NewFloat(4), y)
+	discriminant := new(big.Float).Add(
+		new(big.Float).Mul(xyMinusPa, xyMinusPa),
+		fourY,
+	)
 
 	// sqrt_discriminant = √discriminant
-	sqrtDiscriminant, err := decimalSqrt(discriminant)
-	if err != nil {
-		return nil, err
-	}
+	discriminant.Sqrt(discriminant)
 
-	result := paMinusXY.Add(sqrtDiscriminant).Div(decimal.NewFromInt(2)).Mul(scale)
+	result := new(big.Float).Mul(
+		new(big.Float).Quo(new(big.Float).Add(discriminant, paMinusXY), big.NewFloat(2)),
+		big.NewFloat(math.Pow(2, 64)),
+	)
 
-	resultInt := result.Floor().BigInt()
-	return resultInt, nil
+	r, _ := result.Int(nil)
+	return r, nil
 }

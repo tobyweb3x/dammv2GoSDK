@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	ag_binary "github.com/gagliardetto/binary"
-	"github.com/shopspring/decimal"
 )
 
 // GetMinAmountWithSlippage calculates the minimum amount receivable after slippage is applied.
@@ -59,24 +58,29 @@ func MustBigIntToUint128(b *big.Int) ag_binary.Uint128 {
 // GetPriceImpact calculates the percentage difference between the current and next sqrt prices.
 // TODO: take a another look.
 func GetPriceImpact(nextSqrtPrice, currentSqrtPrice *big.Int) float64 {
+
+	// price = (sqrtPrice)^2 * 10 ** (base_decimal - quote_decimal) / 2^128
+	// k = 10^(base_decimal - quote_decimal) / 2^128
+	// priceA = (sqrtPriceA)^2 * k
+	// priceB = (sqrtPriceB)^2 * k
+	// => price_impact = k * abs ( (sqrtPriceA)^2 - (sqrtPriceB)^2  )  * 100 /  (sqrtPriceB)^2 * k
+	// => price_impact = abs ( (sqrtPriceA)^2 - (sqrtPriceB)^2  )  * 100 / (sqrtPriceB)^2
 	// (sqrtA^2 - sqrtB^2).Abs() * 100 / (sqrtB^2)
+	currentSquared := new(big.Float).Mul(
+		new(big.Float).SetInt(currentSqrtPrice),
+		new(big.Float).SetInt(currentSqrtPrice),
+	)
 
-	// Compute (sqrtPrice)^2
-	sqrtA2 := new(big.Int).Mul(nextSqrtPrice, nextSqrtPrice)
-	sqrtB2 := new(big.Int).Mul(currentSqrtPrice, currentSqrtPrice)
+	diff := new(big.Float).Sub(
+		new(big.Float).Mul(new(big.Float).SetInt(nextSqrtPrice), new(big.Float).SetInt(nextSqrtPrice)),
+		currentSquared,
+	)
+	diff.Abs(diff)
 
-	// Compute absolute difference
-	diff := new(big.Int).Sub(sqrtA2, sqrtB2)
-	if diff.Sign() < 0 {
-		diff.Neg(diff)
-	}
+	r, _ := new(big.Float).Mul(
+		new(big.Float).Quo(diff, currentSquared),
+		big.NewFloat(100),
+	).Float64()
 
-	// Convert to decimal for division and percentage
-	diffDecimal := decimal.NewFromBigInt(diff, 0)
-	sqrtB2Decimal := decimal.NewFromBigInt(sqrtB2, 0)
-
-	// (|sqrtA² - sqrtB²| / sqrtB²) * 100
-	priceImpact := diffDecimal.Div(sqrtB2Decimal).Mul(decimal.NewFromInt(100))
-
-	return priceImpact.InexactFloat64()
+	return r
 }

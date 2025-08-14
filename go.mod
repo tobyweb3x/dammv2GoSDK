@@ -10,7 +10,6 @@ require (
 	github.com/gagliardetto/solana-go v1.12.0
 	github.com/gagliardetto/treeout v0.1.4
 	github.com/mr-tron/base58 v1.2.0
-	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 )
